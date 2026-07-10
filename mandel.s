@@ -13,6 +13,8 @@ mandelbrot: # u8 iterations, f32 real_component[16], f32 imag_component[16], u8 
 
         pxor %xmm15, %xmm15 # hue mask
         kxnorw %k4, %k4, %k4 # k4=0xffff. k4 = running whether valid or not. do EVERYTHING with k4
+
+        vpbroadcastd (threshold), %zmm12 # comparison. is much slower to read from memory, so we pre-broadcast
   .iter:
         # z = z^2 + c. in other words:
         # Re(z) = Re(z)^2 - Im(z)^2 + Re(c)
@@ -29,8 +31,7 @@ mandelbrot: # u8 iterations, f32 real_component[16], f32 imag_component[16], u8 
         # compare if any number is too high. this is if |z| >= 2, or more easily computed, that |z|^2 >= 4.
         # write to k1 if z8 !< 4.0, using an unordered comparison (so always true for NaN, as only way to get NaN is (Inf - Inf) in this case).
         # full instruction means Vector CoMPare Not Less Than Unordered Quiet (i.e. no exceptions if NaN) over Packed Singles.
-        # this also broadcasts the threshold using weird esoteric notation
-        vcmpnlt_uqps (threshold) {1to16}, %zmm8, %k1 {%k4}
+        vcmpnlt_uqps %zmm12, %zmm8, %k1 {%k4}
         vpbroadcastb %ecx, %xmm15 {%k1} # put least significant byte of ecx in every cell of xmm15 that was infinite (i.e. write to cells that are infinite, when they became infinite)
         kandnw       %k4, %k1, %k4 # invert those infinite ones in %k4, as there is no point continuing computation for them
 
