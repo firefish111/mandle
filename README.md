@@ -1,4 +1,4 @@
-# mandel
+# mandle
 
 A Mandelbrot Set calculator and renderer for the terminal, aimed to be highly optimised and written using SIMD instructions.
 

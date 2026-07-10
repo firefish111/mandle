@@ -1,15 +1,16 @@
 .section .text
 .globl mandelbrot
 
-mandelbrot: # u8 iterations, f32 real_component[16], f32 imag_component[16], u8 output_hues[16]
-        movq   %rcx, %r8  # stash output hues' location, as rcx has to be used for the loop
+mandelbrot: # u8 iterations (dil), u8 * output_hues (rsi), f32x16 real_component (z0), f32x16 imag_component (z1)
         movzbq %dil, %rcx # loop count
 
-        vpxorq    %zmm0, %zmm0, %zmm0  # z0 = Re(z)
-        vmovdqa64 %zmm0, %zmm1         # z1 = Im(z)
+        # z0 = Re(z); z1 = Im(z). technically starts off at 0, but we can optimise by precalculating the first round by setting z to c
+        # z2 = Re(c); z3 = Im(c)
+        # Re and Im of c are passed in z0 and z1 respectively. this allows us to easily do our z = c optimisation, by doing absolutel nothing
+        # therefore, we must copy Re and Im of c to z2 and z3.
 
-        vmovdqa64 (%rsi), %zmm2        # z2 = Re(c)
-        vmovdqa64 (%rdx), %zmm3        # z3 = Im(c)
+        vmovdqa64 %zmm0, %zmm2  # z2 = Re(c)
+        vmovdqa64 %zmm1, %zmm3  # z3 = Im(c)
 
         pxor %xmm15, %xmm15 # hue mask
         kxnorw %k4, %k4, %k4 # k4=0xffff. k4 = running whether valid or not. do EVERYTHING with k4
@@ -42,7 +43,7 @@ mandelbrot: # u8 iterations, f32 real_component[16], f32 imag_component[16], u8 
 
         loop .iter
 
-        movdqa %xmm15, (%r8) # write colour data
+        movdqa %xmm15, (%rsi) # write colour data
 
         ret
 

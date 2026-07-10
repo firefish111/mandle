@@ -2,11 +2,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-//#include <math.h>
 #include <immintrin.h>
 
 typedef uint8_t hue_t;
-extern void mandelbrot(uint8_t iterations, const float *real_block, const float *imag_block, hue_t* output_hues);
+extern void mandelbrot(uint8_t iterations, hue_t* output_hues, __m512 real_block, __m512 imag_block);
 
 #define BOUND_LEFT  -2.0
 #define BOUND_RIGHT  1.0
@@ -23,7 +22,7 @@ extern void mandelbrot(uint8_t iterations, const float *real_block, const float 
 
 inline bool bitset(const void *src, unsigned int bit) {
   bool o;
-  asm volatile ("bts %2, (%1)" :
+  asm volatile ("btsl %2, (%1)" :
       "=@ccc" (o)
       : "r" (src),
         "ir" (bit)
@@ -46,7 +45,7 @@ void dfs(void* visited, unsigned col, unsigned row, __m512 real, __m512 imag, fl
   // do 255 iterations. the function writes to its out buffer how many iterations are left
   // when it surpasses the outer limit, so by starting with the maximum (255), we can just
   // negate it to yield a 1-255 of how many iterations it took, whilst keeping 0 the same.
-  mandelbrot(0xff, (const float *) &real, (const float *) &imag, out + (block_id * BOX_N_CELLS));
+  mandelbrot(255, out + (block_id * BOX_N_CELLS), real, imag);
 
   if (row + 1 < BOXES_DOWN) {
     /* recurse across */
@@ -64,7 +63,6 @@ void dfs(void* visited, unsigned col, unsigned row, __m512 real, __m512 imag, fl
 
   if (col + 1 < BOXES_ACROSS) {
     /* recurse down */
-
     dfs(
       visited,
       col + 1,
@@ -87,10 +85,10 @@ int main(int argc, char *argv[]) {
   // ditto for loading out of an xmm register
 
   hue_t *out = aligned_alloc(16, BOXES_ACROSS * BOXES_DOWN * BOX_N_CELLS);
+  void *visited = malloc(BOXES_DOWN * BOXES_ACROSS / 8); // 8 bits per byte
 
   const float real_sep = (BOUND_RIGHT - BOUND_LEFT) / BOXES_ACROSS / BOX_WIDTH;
   const float imag_sep = (BOUND_DOWN - BOUND_UP) / BOXES_DOWN / BOX_HEIGHT;
-  void *visited = malloc(BOXES_DOWN * BOXES_ACROSS / 8); // 8 bits per byte
 
   // create 4x4 box, starting with BOUND_UP and BOUND_LEFT like so:
   // 0+0i 1+0i 2+0i 3+0i, where each difference across is real_sep
@@ -118,8 +116,6 @@ int main(int argc, char *argv[]) {
   );
 
   for (unsigned int y = 0; y < (BOXES_DOWN * BOX_HEIGHT); ++y) {
-    //printf("> y = %d", y);
-    //fflush(stdout);
     putchar('|');
     for (unsigned int x = 0; x < (BOXES_ACROSS * BOX_WIDTH); ++x) {
       unsigned block_id = (x / BOX_WIDTH) + (BOXES_ACROSS * (y / BOX_HEIGHT));
