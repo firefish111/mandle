@@ -6,8 +6,8 @@ mandelbrot: # u8 iterations (dil), u8 * output_hues (rsi), f32x16 real_component
 
         # z0 = Re(z); z1 = Im(z). technically starts off at 0, but we can optimise by precalculating the first round by setting z to c
         # z2 = Re(c); z3 = Im(c)
-        # Re and Im of c are passed in z0 and z1 respectively. this allows us to easily do our z = c optimisation, by doing absolutel nothing
-        # therefore, we must copy Re and Im of c to z2 and z3.
+        # Re and Im of c are passed in z0 and z1 respectively. this allows us to easily do our z = c optimisation, by doing absolutely nothing
+        # instead, we must copy Re and Im of c to z2 and z3, where we expect c to be.
 
         vmovdqa64 %zmm0, %zmm2  # z2 = Re(c)
         vmovdqa64 %zmm1, %zmm3  # z3 = Im(c)
@@ -31,6 +31,7 @@ mandelbrot: # u8 iterations (dil), u8 * output_hues (rsi), f32x16 real_component
 
         # compare if any number is too high. this is if |z| >= 2, or more easily computed, that |z|^2 >= 4.
         # write to k1 if z8 !< 4.0, using an unordered comparison (so always true for NaN, as only way to get NaN is (Inf - Inf) in this case).
+        # this means that NaN, which can only possibly mean reached infinity far too quickly in this case, is treated as such
         # full instruction means Vector CoMPare Not Less Than Unordered Quiet (i.e. no exceptions if NaN) over Packed Singles.
         vcmpnlt_uqps %zmm12, %zmm8, %k1 {%k4}
         vpbroadcastb %ecx, %xmm15 {%k1} # put least significant byte of ecx in every cell of xmm15 that was infinite (i.e. write to cells that are infinite, when they became infinite)
