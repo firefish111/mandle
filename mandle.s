@@ -1,7 +1,8 @@
 .section .text
-.globl mandelbrot
+.globl _ZN10Mandelbrot7computeEhDv16_fS0_
 
-mandelbrot: # u8 iterations (dil), u8 * output_hues (rsi), f32x16 real_component (z0), f32x16 imag_component (z1)
+# c++ mangled name, i.e. Mandelbrot::compute(unsigned char, __m512, __m512)
+_ZN10Mandelbrot7computeEhDv16_fS0_: # u8 iterations (dil), f32x16 real_component (z0), f32x16 imag_component (z1) -> u8x16 hues (x0)
         movzbq %dil, %rcx # loop count
 
         # z0 = Re(z); z1 = Im(z). technically starts off at 0, but we can optimise by precalculating the first round by setting z to c
@@ -44,8 +45,7 @@ mandelbrot: # u8 iterations (dil), u8 * output_hues (rsi), f32x16 real_component
 
         loop .iter
 
-        movdqa %xmm15, (%rsi) # write colour data
-
+        movdqa %xmm15, %xmm0 # return colour data
         ret
 
 .section .rodata

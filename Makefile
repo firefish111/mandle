@@ -5,5 +5,5 @@
 # tested on -march=tigerlake.
 CFLAGS := -O3 -march=native -no-pie
 
-mandle: mandle.c mandle.s
-	gcc $^ $(CFLAGS) -o $@
+mandle: mandle.cc mandle.s
+	g++ $^ $(CFLAGS) -o $@
