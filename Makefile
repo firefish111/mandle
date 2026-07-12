@@ -3,7 +3,7 @@
 # -no-pie is necessary for assembly code, as compiler otherwise gets squeamish about relocation data
 # -march=native so that it actually generates fancy instructions.
 # tested on -march=tigerlake.
-CFLAGS := -O3 -march=native -no-pie
+CFLAGS := -O3 -march=native -no-pie -Wall -Wextra -Werror
 
-mandle: mandle.cc mandle.s
+mandle: mandle.cc # mandle.s
 	g++ $^ $(CFLAGS) -o $@

@@ -4,9 +4,6 @@
 #include <cstring>
 #include <immintrin.h>
 
-typedef uint8_t hue_t;
-// extern void mandelbrot(uint8_t iterations, hue_t* output_hues, __m512 real_block, __m512 imag_block);
-
 #define BOUND_LEFT  -2.0
 #define BOUND_RIGHT  1.0
 
@@ -37,10 +34,15 @@ inline bool bit_test_and_set_high(const void *src, unsigned int bit) {
   return o;
 }
 
-class Mandelbrot {
+// 0 = tends to 0
+// 1-255 = tends to infinity, slowest = 1, fastest = 255
+typedef uint8_t hue_t;
+
+// abstract class for viewer of any class
+class Viewer {
   union HueTable { // easier type punning of hue table
     hue_t  * hues;
-    __m128 * xmmtab;
+    __m128i * xmmtab;
   };
   union HueTable huebuf;
 
@@ -50,11 +52,10 @@ class Mandelbrot {
   float real_sep;
   float imag_sep;
 
-  // external asm function. does not take a this pointer, as output_hues is not necessarily this->huebuf
-  static __m128 compute(uint8_t iterations, __m512 real_block, __m512 imag_block);
+  virtual __m128i compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const = 0;
 
-public:
-  void search(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) const {
+  // walk dfs helper function. initially called in other overload
+  void walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) const {
     // block_x and block_y are which block we are pointing to. we convert this to a linear
     // block id, where blocks are numbered like so:
     //   0  1  2  3  4  5
@@ -74,7 +75,7 @@ public:
 
     if (block_x + 1 < BLOCKS_ACROSS) {
       /* recurse across in real direction */
-      this->search(
+      this->walk(
         block_x + 1,
         block_y,
         _mm512_add_ps(real, _mm512_set1_ps(this->real_sep * BLOCK_WIDTH)), // this is clever enough to optimise into single broadcast instruction, if possible
@@ -84,13 +85,45 @@ public:
 
     if (block_y + 1 < BLOCKS_DOWN) {
       /* recurse down in imaginary direction */
-      this->search(
+      this->walk(
         block_x,
         block_y + 1,
         real,
         _mm512_add_ps(imag, _mm512_set1_ps(this->imag_sep * BLOCK_HEIGHT)) // ditto but for imaginary
       );
     }
+  }
+
+public:
+  // publicly available, begins walking
+  void walk() const {
+    // to be loaded into a zmm register, it needs to be 64-byte aligned
+    // instead of setting them to tyoe __m512 right away, we want to set it to some values,
+    // which we can't do as just a __m512 type, so we do the conversion with a type pun at the dfs call
+    float real_block[16] __attribute__ ((aligned(64)));
+    float imag_block[16] __attribute__ ((aligned(64)));
+
+    // create 4x4 block, starting with BOUND_UP and BOUND_LEFT like so:
+    // 0+0i 1+0i 2+0i 3+0i, where each difference across is real_sep
+    // 0+1i 1+1i 2+1i 3+1i
+    // 0+2i 1+2i 2+2i 3+2i
+    // 0+3i 1+3i 2+3i 3+3i
+    // where each difference down is imag_sep
+    for (int re = 0; re < BLOCK_WIDTH; re++) {
+      for (int im = 0; im < BLOCK_HEIGHT; im++) {
+        real_block[re + im*BLOCK_HEIGHT] = BOUND_LEFT + (re * this->real_sep); // + real_sep for each re
+        imag_block[re + im*BLOCK_HEIGHT] = BOUND_UP   + (im * this->imag_sep);
+      }
+    }
+
+    // *actually* do the search, by invoking our recursive function
+    // start from top left, and crawl downwards and rightwards
+    this->walk(
+      0, // start from BOUND_LEFT
+      0, // start from BOUND_UP
+      *((__m512 *) real_block), // our initial block's real component
+      *((__m512 *) imag_block)  // our initial block's imaginary component
+    );
   }
 
   void draw() const {
@@ -125,53 +158,116 @@ public:
     }
   }
 
-  Mandelbrot(float horiz_sep, float vert_sep) : real_sep(horiz_sep), imag_sep(vert_sep) {
+  Viewer(float horiz_sep, float vert_sep) : real_sep(horiz_sep), imag_sep(vert_sep) {
     // doesn't matter which union element we use, but using xmmtab to demonstrate 16-alignment
-    this->huebuf.xmmtab = (__m128 *) aligned_alloc(16, BLOCKS_ACROSS * BLOCKS_DOWN * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
+    this->huebuf.xmmtab = (__m128i *) aligned_alloc(16, BLOCKS_ACROSS * BLOCKS_DOWN * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
     this->visited = malloc(BLOCKS_DOWN * BLOCKS_ACROSS / 8); // 8 bits per byte
   }
 
-  ~Mandelbrot() {
+  ~Viewer() {
     free(this->huebuf.xmmtab);
     free(this->visited);
   }
 };
 
+class Mandelbrot : public Viewer {
+  // external asm function. hos to take a this pointer, but it is never used.
+  // this is because static methods can't be virtual, as an upcast to a parent class
+  // will result in the wrong static method being called
+  __m128i compute(uint8_t iterations, __m512 c_real, __m512 c_imag) const {
+    // what we want to do is z <- z^2 + c, where z,c \in \mathbb{C}.
+    // because they're both complex, we have to do slightly different things to both the real and imaginary components.
+    // there is an intrinsic for complex multiplication, but it's only available on the fanciest xeons, and operates only on half floats, so we do it ourselves
 
-int main(int argc, char *argv[]) {
-  // to be loaded into a zmm register, it needs to be 64-byte aligned
-  // instead of setting them to tyoe __m512 right away, we want to set it to some values,
-  // which we can't do as just a __m512 type, so we do the conversion with a type pun at the dfs call
-  float real_block[16] __attribute__ ((aligned(64)));
-  float imag_block[16] __attribute__ ((aligned(64)));
+    // technically, for mandelbrot, initial z is 0.
+    // but, after first iteration, z will always equal c, so we can optimise away first iteration
+    __m512 z_real = c_real;
+    __m512 z_imag = c_imag;
 
+    // we mask away the ones we don't want to continue calculating, as otherwise they'll wind up at infinity or NaN.
+    // at first, set it to all ones. (optimised down to kxnor)
+    __mmask16 still_left = _cvtu32_mask16(0xffff);
+
+    // hue table. this is set to the value of how many iterations are left once it surpasses the boundary, so smaller values are more intense colours, but 0 is black.
+    // we set this value only exactly when we surpass the boundary, so we at first set it all to 0.
+    __m128i hues = _mm_set1_epi8(0);
+
+    for (; iterations > 0; iterations--) {
+      // do the boundary check. people with PhDs have proven that if |z| >= 2, it is guaranteed to tend to infinity.
+      // therefore, we do this check. to save us computing the square root, we instead do |z|^2 >= 4,
+      // which is easily calculable as Re(z)^2 + Im(z)^2.
+      // don't worry, optimiser will be kind enough to reuse the squaring of these values.
+      __m512 square_magnitude = _mm512_add_ps(
+        _mm512_mul_ps(z_real, z_real),
+        _mm512_mul_ps(z_imag, z_imag)
+      );
+
+      // compare with mode NLT_UQ, which means "Not Less Than Unordered Quiet", or in other words:
+      // Not Less Than, i.e. greater than or equal to. the weird name is because this is the inverted mode of GE_OQ, which behaves "properly" with NaNs.
+      // Unordered. typically, with ordered comparison, NaN is not less than, equal to, or greater than anything. Unordered is the opposite.
+      // we want this behaviour, as the only way NaN can be achieved here is with Inf - Inf, which guarantees we've reached infinity, so we want true to be returned.
+      // and finally Quiet, so it doesn't throw the toys out the pram if it finds a NaN
+      // we save this to a mask, so we can do the operations respective to the results.
+      __mmask16 infinite = _mm512_mask_cmp_ps_mask(
+        still_left, // we mask out the operation with the still_left mask, as we only want to find ones that have *changed* since last iteration, as otherwise we'll be setting every colour.
+        square_magnitude, // |z|^2 >= 4
+        _mm512_set1_ps(4.0), // splat of 4.0. optimiser is clever enough to deal with this efficiently
+        _CMP_NLT_UQ // mpde, see above
+      );
+
+      // set hues for only the newly-found infinite values,
+      // by masking out a broadcast of our loop counter
+      hues = _mm_mask_set1_epi8(hues, infinite, iterations);
+
+      // we don't want to continue calculation for those that we've already proven tend to infinity.
+      // therefore, we turn off specifially those bits in our existing mask, eliminating those
+      still_left = _kandn_mask16(infinite, still_left);
+
+      // z = z^2 + c. in other words:
+      // Re(z) = Re(z)^2 - Im(z)^2 + Re(c)
+      // Im(z) = 2 * Re(z) * Im(z) + Im(c)
+
+      // we don't set them right away, for two reasons: to add the masks later,
+      // and that Im(z) depends on Re(z), and we don't want this to be the new Re(z).
+      __m512 next_z_real = _mm512_add_ps(
+        _mm512_sub_ps(
+          _mm512_mul_ps(z_real, z_real), // optimiser is clever enough to squash this into a fused multiply-add instruction
+          _mm512_mul_ps(z_imag, z_imag)
+        ),
+        c_real
+      );
+
+      __m512 next_z_imag = _mm512_add_ps(
+        _mm512_mul_ps(
+          _mm512_add_ps(z_real, z_real),
+          z_imag
+        ),
+        c_imag
+      );
+
+      // optimised away and into the most recent operation (in both cases, the add)
+      z_real = _mm512_mask_mov_ps(z_real, still_left, next_z_real);
+      z_imag = _mm512_mask_mov_ps(z_imag, still_left, next_z_imag);
+    }
+
+    return hues;
+  };
+
+  // force inherit constructor.
+  using Viewer::Viewer;
+
+  /* parent destructor is already automatically called, so no memory leak */
+};
+
+int main(void) {
   const float real_sep = (BOUND_RIGHT - BOUND_LEFT) / BLOCKS_ACROSS / BLOCK_WIDTH;
   const float imag_sep = (BOUND_DOWN - BOUND_UP) / BLOCKS_DOWN / BLOCK_HEIGHT;
 
-  // create 4x4 block, starting with BOUND_UP and BOUND_LEFT like so:
-  // 0+0i 1+0i 2+0i 3+0i, where each difference across is real_sep
-  // 0+1i 1+1i 2+1i 3+1i
-  // 0+2i 1+2i 2+2i 3+2i
-  // 0+3i 1+3i 2+3i 3+3i
-  // where each difference down is imag_sep
-  for (int re = 0; re < BLOCK_WIDTH; re++) {
-    for (int im = 0; im < BLOCK_HEIGHT; im++) {
-      real_block[re + im*BLOCK_HEIGHT] = BOUND_LEFT + (re * real_sep); // + real_sep for each re
-      imag_block[re + im*BLOCK_HEIGHT] = BOUND_UP   + (im * imag_sep);
-    }
-  }
+  // needs to be a pointer, as abstract classes do not have a known size, so can only exist by pointer
+  class Viewer *m = new Mandelbrot (real_sep, imag_sep);
 
-  class Mandelbrot m(real_sep, imag_sep);
-
-  // start from top left, and crawl downwards and rightwards
-  m.search(
-    0,
-    0,
-    *((__m512 *) real_block),
-    *((__m512 *) imag_block)
-  );
-
-  m.draw();
+  m->walk();
+  m->draw();
 
   return 0;
 }
