@@ -5,16 +5,18 @@
 #include <cmath>
 #include <immintrin.h>
 
+#include <numbers>
+
 #define BOUND_LEFT  -2.0
-#define BOUND_RIGHT  1.0
+#define BOUND_RIGHT  2.0
 
 #define BOUND_UP     1.0
 #define BOUND_DOWN  -1.0
 
-#define SECTION_WIDTH  5
-#define SECTION_HEIGHT 5
+#define SECTION_WIDTH  3
+#define SECTION_HEIGHT 3
 
-#define BLOCKS_ACROSS (SECTION_WIDTH  * 3)
+#define BLOCKS_ACROSS (SECTION_WIDTH  * 4)
 #define BLOCKS_DOWN   (SECTION_HEIGHT * 2)
 
 #define BLOCK_WIDTH    4
@@ -42,7 +44,7 @@ typedef uint8_t hue_t;
 // abstract class for viewer of any class
 class Viewer {
   union HueTable { // easier type punning of hue table
-    hue_t  * hues;
+    hue_t   * hues;
     __m128i * xmmtab;
   };
   union HueTable huebuf;
@@ -289,9 +291,9 @@ class Mandelbrot : public ComplexQuadraticPolynomial {
     };
   }
 
-  // set the escape radius to 2, as people with PhDs said so. we return this squared
+  // set the escape radius to 2, as people with PhDs said so. we return this squared to ease computation
   constexpr float squared_escape_radius() const {
-    return 4.0;
+    return 4.0f;
   }
 
 public:
@@ -299,13 +301,56 @@ public:
   Mandelbrot() {}
 };
 
+// julia set. instead of varying c, vary z and provide a constant c.
+class Julia : public ComplexQuadraticPolynomial {
+  const float c_real;
+  const float c_imag;
+
+  InitialConditions initial(__m512 real_block, __m512 imag_block) const {
+    // parameters are given as what varies.
+    // this varies z and sets c to our constant
+    return (InitialConditions) {
+      .z_real = real_block,
+      .z_imag = imag_block,
+      .c_real = _mm512_set1_ps(this->c_real),
+      .c_imag = _mm512_set1_ps(this->c_imag),
+    };
+  }
+
+  // escape radius R > 0 must adhere to the following inequality: R^2 - R >= |c| given c.
+  // we choose the smallest reasonable R by taking the ceiling
+  // this is constexpr so we can afford to do some fancy things with operations
+  constexpr float squared_escape_radius() const {
+    // by completing the square, we get that: R >= 1/2 + sqrt(|c| + 1/4), taking the positive root as R > 0.
+    // we take the ceil of that to get a reasonable value of R
+
+    // we want to do hypot, but hypot is opaque to optimiser
+    // float c_mag = hypotf(this->c_real, this->c_imag); // |c|
+    float c_mag = sqrtf(this->c_real*this->c_real + this->c_imag*this->c_imag); // |c|
+    float R_base = 0.5f + sqrtf(c_mag + 0.25f);
+    return ceilf(R_base);
+  }
+
+public:
+  Julia(float c_real, float c_imag) : c_real(c_real), c_imag(c_imag) {}
+};
+
 int main(void) {
 
   // needs to be a pointer, as abstract classes do not have a known size, so can only exist by pointer
-  class Viewer *m = new Mandelbrot ();
+  {
+    class Viewer *j = new Julia(-0.674f, -0.32f);
 
-  m->walk();
-  m->draw();
+    j->walk();
+    j->draw();
+  }
+
+  {
+    class Viewer *m = new Mandelbrot();
+
+    m->walk();
+    m->draw();
+  }
 
   return 0;
 }
