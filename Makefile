@@ -1,9 +1,8 @@
 .DEFAULT_GOAL := mandle
 
-# -no-pie is necessary for assembly code, as compiler otherwise gets squeamish about relocation data
 # -march=native so that it actually generates fancy instructions.
 # tested on -march=tigerlake.
-CFLAGS := -O3 -march=native -no-pie -Wall -Wextra -Werror
+CFLAGS := -O3 -march=native -Wall -Wextra -Werror -std=c++20
 
-mandle: mandle.cc # mandle.s
+mandle: mandle.cc
 	g++ $^ $(CFLAGS) -o $@

@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
+#include <cmath>
 #include <immintrin.h>
 
 #define BOUND_LEFT  -2.0
@@ -49,8 +50,8 @@ class Viewer {
   // bit vector
   void * visited;
 
-  float real_sep;
-  float imag_sep;
+  const float real_sep;
+  const float imag_sep;
 
   virtual __m128i compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const = 0;
 
@@ -158,7 +159,10 @@ public:
     }
   }
 
-  Viewer(float horiz_sep, float vert_sep) : real_sep(horiz_sep), imag_sep(vert_sep) {
+  Viewer() :
+    real_sep((BOUND_RIGHT - BOUND_LEFT) / BLOCKS_ACROSS / BLOCK_WIDTH),
+    imag_sep((BOUND_DOWN - BOUND_UP) / BLOCKS_DOWN / BLOCK_HEIGHT)
+  {
     // doesn't matter which union element we use, but using xmmtab to demonstrate 16-alignment
     this->huebuf.xmmtab = (__m128i *) aligned_alloc(16, BLOCKS_ACROSS * BLOCKS_DOWN * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
     this->visited = malloc(BLOCKS_DOWN * BLOCKS_ACROSS / 8); // 8 bits per byte
@@ -170,19 +174,36 @@ public:
   }
 };
 
-class Mandelbrot : public Viewer {
-  // external asm function. hos to take a this pointer, but it is never used.
+// superclass of Julia and Mandelbrot sets.
+// this is an iterative function that creates a 2d plot is z <- z^2 + c, where z,c \in \mathbb{C}.
+// because the only difference between them in the initial conditions, we have a method that defines them.
+class ComplexQuadraticPolynomial : public Viewer {
+protected:
+  struct InitialConditions {
+    __m512 z_real;
+    __m512 z_imag;
+    __m512 c_real;
+    __m512 c_imag;
+  };
+
+  // return initial conditions based on the iterating block
+  virtual InitialConditions initial(__m512 real_block, __m512 imag_block) const = 0;
+
+  // the radius after which infinity is guaranteed.
+  // squared to ease computation
+  // constexpr so it can be evaluated at compile time
+  virtual constexpr float squared_escape_radius() const = 0;
+
+private:
+  // has to take a this pointer, but it is never used.
   // this is because static methods can't be virtual, as an upcast to a parent class
   // will result in the wrong static method being called
-  __m128i compute(uint8_t iterations, __m512 c_real, __m512 c_imag) const {
+  __m128i compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const {
     // what we want to do is z <- z^2 + c, where z,c \in \mathbb{C}.
     // because they're both complex, we have to do slightly different things to both the real and imaginary components.
     // there is an intrinsic for complex multiplication, but it's only available on the fanciest xeons, and operates only on half floats, so we do it ourselves
 
-    // technically, for mandelbrot, initial z is 0.
-    // but, after first iteration, z will always equal c, so we can optimise away first iteration
-    __m512 z_real = c_real;
-    __m512 z_imag = c_imag;
+    auto [z_real, z_imag, c_real, c_imag] = this->initial(real_block, imag_block);
 
     // we mask away the ones we don't want to continue calculating, as otherwise they'll wind up at infinity or NaN.
     // at first, set it to all ones. (optimised down to kxnor)
@@ -193,8 +214,9 @@ class Mandelbrot : public Viewer {
     __m128i hues = _mm_set1_epi8(0);
 
     for (; iterations > 0; iterations--) {
-      // do the boundary check. people with PhDs have proven that if |z| >= 2, it is guaranteed to tend to infinity.
-      // therefore, we do this check. to save us computing the square root, we instead do |z|^2 >= 4,
+      // do the boundary check. people with PhDs have proven that if |z| >= R where R is an escape radius, it is guaranteed to tend to infinity.
+      // R can mean different things depending on which sets, q.v. for more.
+      // therefore, we do this check. to save us computing the square root, we instead do |z|^2 >= R^2,
       // which is easily calculable as Re(z)^2 + Im(z)^2.
       // don't worry, optimiser will be kind enough to reuse the squaring of these values.
       __m512 square_magnitude = _mm512_add_ps(
@@ -211,8 +233,8 @@ class Mandelbrot : public Viewer {
       __mmask16 infinite = _mm512_mask_cmp_ps_mask(
         still_left, // we mask out the operation with the still_left mask, as we only want to find ones that have *changed* since last iteration, as otherwise we'll be setting every colour.
         square_magnitude, // |z|^2 >= 4
-        _mm512_set1_ps(4.0), // splat of 4.0. optimiser is clever enough to deal with this efficiently
-        _CMP_NLT_UQ // mpde, see above
+        _mm512_set1_ps(this->squared_escape_radius()), // splat of escape radius squared. optimiser is clever enough to deal with this efficiently
+        _CMP_NLT_UQ // mode, see above
       );
 
       // set hues for only the newly-found infinite values,
@@ -239,7 +261,7 @@ class Mandelbrot : public Viewer {
 
       __m512 next_z_imag = _mm512_add_ps(
         _mm512_mul_ps(
-          _mm512_add_ps(z_real, z_real),
+          _mm512_add_ps(z_real, z_real), // efficient 2 * Re(z)
           z_imag
         ),
         c_imag
@@ -252,19 +274,35 @@ class Mandelbrot : public Viewer {
 
     return hues;
   };
+};
 
-  // force inherit constructor.
-  using Viewer::Viewer;
+class Mandelbrot : public ComplexQuadraticPolynomial {
+  InitialConditions initial(__m512 real_block, __m512 imag_block) const {
+    // technically, for mandelbrot, initial z is 0.
+    // but, after first iteration, z will always equal c, so we can optimise away first iteration,
+    // by setting BOTH values to the same thing
+    return (InitialConditions) {
+      .z_real = real_block,
+      .z_imag = imag_block,
+      .c_real = real_block,
+      .c_imag = imag_block,
+    };
+  }
 
-  /* parent destructor is already automatically called, so no memory leak */
+  // set the escape radius to 2, as people with PhDs said so. we return this squared
+  constexpr float squared_escape_radius() const {
+    return 4.0;
+  }
+
+public:
+  // basic constructor. parent constructor and destructor are called automatically unless explicitly called
+  Mandelbrot() {}
 };
 
 int main(void) {
-  const float real_sep = (BOUND_RIGHT - BOUND_LEFT) / BLOCKS_ACROSS / BLOCK_WIDTH;
-  const float imag_sep = (BOUND_DOWN - BOUND_UP) / BLOCKS_DOWN / BLOCK_HEIGHT;
 
   // needs to be a pointer, as abstract classes do not have a known size, so can only exist by pointer
-  class Viewer *m = new Mandelbrot (real_sep, imag_sep);
+  class Viewer *m = new Mandelbrot ();
 
   m->walk();
   m->draw();
