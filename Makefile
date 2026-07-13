@@ -4,5 +4,5 @@
 # tested on -march=tigerlake.
 CFLAGS := -O3 -march=native -Wall -Wextra -Werror -std=c++20
 
-mandle: mandle.cc
+mandle: src/main.cc
 	g++ $^ $(CFLAGS) -o $@

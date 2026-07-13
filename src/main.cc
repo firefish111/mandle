@@ -5,8 +5,6 @@
 #include <cmath>
 #include <immintrin.h>
 
-#include <numbers>
-
 #define BOUND_LEFT  -2.0
 #define BOUND_RIGHT  2.0
 
@@ -48,6 +46,17 @@ class Viewer {
     __m128i * xmmtab;
   };
   union HueTable huebuf;
+
+  struct BoundInfo {
+    float left;
+    float right;
+    float top;
+    float bottom;
+
+    uint8_t n_blocks_x;
+    uint8_t n_blocks_y;
+  };
+//  const struct BoundInfo bounds;
 
   // bit vector
   void * visited;
@@ -332,25 +341,35 @@ class Julia : public ComplexQuadraticPolynomial {
   }
 
 public:
-  Julia(float c_real, float c_imag) : c_real(c_real), c_imag(c_imag) {}
+  Julia(float c_real, float c_imag) :
+    c_real(c_real),
+    c_imag(c_imag)
+    //box(-2.0f, 2.0f, -1.5f, 1.5f, 2, 2)
+  {}
 };
 
-int main(void) {
+int main(int argc, char *argv[]) {
+  if (argc <= 1) {
+usage:
+    fprintf(stderr, "usage:\t%s m - show mandelbrot set\n\t%s j [real] [imaginary] - show julia set with c = [real] + [imaginary] * i\n", argv[0], argv[0]);
+    return 1;
+  }
+  // argc is guaranteed to be more than 1
 
-  // needs to be a pointer, as abstract classes do not have a known size, so can only exist by pointer
-  {
-    class Viewer *j = new Julia(-0.674f, -0.32f);
-
-    j->walk();
-    j->draw();
+  class Viewer *v = nullptr; // "nullptr is better" - c++ spec
+  if (argv[1][0] == 'm') {
+    v = new Mandelbrot();
+  } else if (argv[1][0] == 'j' && argc >= 4) {
+    v = new Julia(
+      strtof(argv[2], nullptr), // this function is kind enough to tell me where the float ends, but i don't care so nullptr it is
+      strtof(argv[3], nullptr)
+    );
+  } else {
+    goto usage;
   }
 
-  {
-    class Viewer *m = new Mandelbrot();
-
-    m->walk();
-    m->draw();
-  }
+  v->walk();
+  v->draw();
 
   return 0;
 }
