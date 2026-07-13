@@ -5,18 +5,9 @@
 #include <cmath>
 #include <immintrin.h>
 
-#define BOUND_LEFT  -2.0
-#define BOUND_RIGHT  2.0
-
-#define BOUND_UP     1.0
-#define BOUND_DOWN  -1.0
-
-#define SECTION_WIDTH  3
-#define SECTION_HEIGHT 3
-
-#define BLOCKS_ACROSS (SECTION_WIDTH  * 4)
-#define BLOCKS_DOWN   (SECTION_HEIGHT * 2)
-
+// everything is done in computation blocks.
+// the compute() function calculates an entire computation block at once through SIMD,
+// so we split the space into blocks, which are walked and calculated by the Viewer
 #define BLOCK_WIDTH    4
 #define BLOCK_HEIGHT   4
 #define BLOCK_N_CELLS 16
@@ -39,7 +30,7 @@ inline bool bit_test_and_set_high(const void *src, unsigned int bit) {
 // 1-255 = tends to infinity, slowest = 1, fastest = 255
 typedef uint8_t hue_t;
 
-// abstract class for viewer of any class
+// abstract class for viewer of any type
 class Viewer {
   union HueTable { // easier type punning of hue table
     hue_t   * hues;
@@ -47,25 +38,37 @@ class Viewer {
   };
   union HueTable huebuf;
 
+  // bit vector
+  void * visited;
+
+protected:
+  // info about the bounds of the window being created
   struct BoundInfo {
+    // the edges of the viewport
     float left;
     float right;
     float top;
     float bottom;
 
+    // the number of computation blocks across and down
     uint8_t n_blocks_x;
     uint8_t n_blocks_y;
+
+    // need to be const as only const methods can be called in a const method
+    constexpr float real_sep() const {
+      return (this->right - this->left) / this->n_blocks_x / BLOCK_WIDTH;
+    }
+
+    constexpr float imag_sep() const {
+      return (this->bottom - this->top) / this->n_blocks_y / BLOCK_HEIGHT;
+    }
   };
-//  const struct BoundInfo bounds;
+  const struct BoundInfo bounds;
 
-  // bit vector
-  void * visited;
-
-  const float real_sep;
-  const float imag_sep;
-
+  // compute function. takes in one block, and returns table of hues for that block.
   virtual __m128i compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const = 0;
 
+private:
   // walk dfs helper function. initially called in other overload
   void walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) const {
     // block_x and block_y are which block we are pointing to. we convert this to a linear
@@ -74,7 +77,7 @@ class Viewer {
     //   6  7  8  9 10 11
     //  12 13 14 15 16 17
     //  18 19 20 21 22 23
-    unsigned block_id = block_x + (block_y * BLOCKS_ACROSS);
+    unsigned block_id = block_x + (block_y * this->bounds.n_blocks_x);
 
     // we set it to visited, but if it was already visited, we return
     bool was_visited = bit_test_and_set_high(this->visited, block_id);
@@ -85,29 +88,30 @@ class Viewer {
     // negate it to yield a 1-255 of how many iterations it took, whilst keeping 0 the same.
     this->huebuf.xmmtab[block_id] = this->compute(255, real, imag);
 
-    if (block_x + 1 < BLOCKS_ACROSS) {
+    if (block_x + 1 < this->bounds.n_blocks_x) {
       /* recurse across in real direction */
       this->walk(
         block_x + 1,
         block_y,
-        _mm512_add_ps(real, _mm512_set1_ps(this->real_sep * BLOCK_WIDTH)), // this is clever enough to optimise into single broadcast instruction, if possible
+        _mm512_add_ps(real, _mm512_set1_ps(this->bounds.real_sep() * BLOCK_WIDTH)), // this is clever enough to optimise into single broadcast instruction, if possible
         imag
       );
     }
 
-    if (block_y + 1 < BLOCKS_DOWN) {
+    if (block_y + 1 < this->bounds.n_blocks_y) {
       /* recurse down in imaginary direction */
       this->walk(
         block_x,
         block_y + 1,
         real,
-        _mm512_add_ps(imag, _mm512_set1_ps(this->imag_sep * BLOCK_HEIGHT)) // ditto but for imaginary
+        _mm512_add_ps(imag, _mm512_set1_ps(this->bounds.imag_sep() * BLOCK_HEIGHT)) // ditto but for imaginary
       );
     }
   }
 
 public:
-  // publicly available, begins walking
+  // publicly available, begin walking.
+  // this generates the starting conditions for the privvate helper function
   void walk() const {
     // to be loaded into a zmm register, it needs to be 64-byte aligned
     // instead of setting them to tyoe __m512 right away, we want to set it to some values,
@@ -115,7 +119,7 @@ public:
     float real_block[16] __attribute__ ((aligned(64)));
     float imag_block[16] __attribute__ ((aligned(64)));
 
-    // create 4x4 block, starting with BOUND_UP and BOUND_LEFT like so:
+    // create 4x4 block, starting with this->bounds.top and this->bounds.left like so:
     // 0+0i 1+0i 2+0i 3+0i, where each difference across is real_sep
     // 0+1i 1+1i 2+1i 3+1i
     // 0+2i 1+2i 2+2i 3+2i
@@ -123,16 +127,16 @@ public:
     // where each difference down is imag_sep
     for (int re = 0; re < BLOCK_WIDTH; re++) {
       for (int im = 0; im < BLOCK_HEIGHT; im++) {
-        real_block[re + im*BLOCK_HEIGHT] = BOUND_LEFT + (re * this->real_sep); // + real_sep for each re
-        imag_block[re + im*BLOCK_HEIGHT] = BOUND_UP   + (im * this->imag_sep);
+        real_block[re + im*BLOCK_HEIGHT] = this->bounds.left + (re * this->bounds.real_sep()); // + real_sep for each re
+        imag_block[re + im*BLOCK_HEIGHT] = this->bounds.top   + (im * this->bounds.imag_sep());
       }
     }
 
     // *actually* do the search, by invoking our recursive function
     // start from top left, and crawl downwards and rightwards
     this->walk(
-      0, // start from BOUND_LEFT
-      0, // start from BOUND_UP
+      0, // start from this->bounds.left
+      0, // start from this->bounds.top
       *((__m512 *) real_block), // our initial block's real component
       *((__m512 *) imag_block)  // our initial block's imaginary component
     );
@@ -142,14 +146,14 @@ public:
     printf("\033[90m| ");
     // print bounds
     int width; // do not initialise: that will happen in the printf %n
-    printf("%f%n", BOUND_LEFT, &width);
-    width = (CELL_N_CHARS * BLOCK_WIDTH * BLOCKS_ACROSS) - width - 2; // subtract from how wise our render is in the first place. - 2 for padding
-    printf("%*f |\n", width, BOUND_RIGHT);
+    printf("%f%n", this->bounds.left, &width);
+    width = (CELL_N_CHARS * BLOCK_WIDTH * this->bounds.n_blocks_x) - width - 2; // subtract from how wise our render is in the first place. - 2 for padding
+    printf("%*f |\n", width, this->bounds.right);
 
-    for (unsigned int y = 0; y < (BLOCKS_DOWN * BLOCK_HEIGHT); ++y) {
+    for (unsigned int y = 0; y < (this->bounds.n_blocks_y * BLOCK_HEIGHT); ++y) {
       putchar('|');
-      for (unsigned int x = 0; x < (BLOCKS_ACROSS * BLOCK_WIDTH); ++x) {
-        unsigned block_id = (x / BLOCK_WIDTH) + (BLOCKS_ACROSS * (y / BLOCK_HEIGHT));
+      for (unsigned int x = 0; x < (this->bounds.n_blocks_x * BLOCK_WIDTH); ++x) {
+        unsigned block_id = (x / BLOCK_WIDTH) + (this->bounds.n_blocks_x * (y / BLOCK_HEIGHT));
         unsigned block_cell = (x % BLOCK_WIDTH) + (BLOCK_WIDTH * (y % BLOCK_HEIGHT));
 
         hue_t colour = this->huebuf.hues[block_cell + (block_id * BLOCK_N_CELLS)];
@@ -162,21 +166,18 @@ public:
       }
       printf("\033[40m|");
       if (y == 0) { // first one
-        printf(" %f", BOUND_UP);
-      } else if (y + 1 == BLOCKS_DOWN * BLOCK_HEIGHT) { // last one
-        printf(" %f", BOUND_DOWN);
+        printf(" %f", this->bounds.top);
+      } else if (y + 1 == this->bounds.n_blocks_y * BLOCK_HEIGHT) { // last one
+        printf(" %f", this->bounds.bottom);
       }
       putchar('\n');
     }
   }
 
-  Viewer() :
-    real_sep((BOUND_RIGHT - BOUND_LEFT) / BLOCKS_ACROSS / BLOCK_WIDTH),
-    imag_sep((BOUND_DOWN - BOUND_UP) / BLOCKS_DOWN / BLOCK_HEIGHT)
-  {
+  Viewer(BoundInfo box) : bounds(box) {
     // doesn't matter which union element we use, but using xmmtab to demonstrate 16-alignment
-    this->huebuf.xmmtab = (__m128i *) aligned_alloc(16, BLOCKS_ACROSS * BLOCKS_DOWN * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
-    this->visited = malloc(BLOCKS_DOWN * BLOCKS_ACROSS / 8); // 8 bits per byte
+    this->huebuf.xmmtab = (__m128i *) aligned_alloc(16, this->bounds.n_blocks_x * this->bounds.n_blocks_y * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
+    this->visited = malloc(this->bounds.n_blocks_y * this->bounds.n_blocks_x / 8); // 8 bits per byte
   }
 
   ~Viewer() {
@@ -187,7 +188,7 @@ public:
 
 // superclass of Julia and Mandelbrot sets.
 // this is an iterative function that creates a 2d plot is z <- z^2 + c, where z,c \in \mathbb{C}.
-// because the only difference between them in the initial conditions, we have a method that defines them.
+// because the only difference between them is the initial conditions, we have a virtual method for our children to define them.
 class ComplexQuadraticPolynomial : public Viewer {
 protected:
   struct InitialConditions {
@@ -202,7 +203,7 @@ protected:
 
   // the radius after which infinity is guaranteed.
   // squared to ease computation
-  // constexpr so it can be evaluated at compile time
+  // constexpr so it "can" be evaluated at compile time, might not be if too complex
   virtual constexpr float squared_escape_radius() const = 0;
 
 private:
@@ -214,6 +215,7 @@ private:
     // because they're both complex, we have to do slightly different things to both the real and imaginary components.
     // there is an intrinsic for complex multiplication, but it's only available on the fanciest xeons, and operates only on half floats, so we do it ourselves
 
+    // can't not be auto
     auto [z_real, z_imag, c_real, c_imag] = this->initial(real_block, imag_block);
 
     // we mask away the ones we don't want to continue calculating, as otherwise they'll wind up at infinity or NaN.
@@ -285,6 +287,9 @@ private:
 
     return hues;
   };
+
+  // force inherit constructor. this is because our children cannot inherit straight from Viewer
+  using Viewer::Viewer;
 };
 
 class Mandelbrot : public ComplexQuadraticPolynomial {
@@ -306,8 +311,8 @@ class Mandelbrot : public ComplexQuadraticPolynomial {
   }
 
 public:
-  // basic constructor. parent constructor and destructor are called automatically unless explicitly called
-  Mandelbrot() {}
+  // call parent constructor with bounds info
+  Mandelbrot() : ComplexQuadraticPolynomial(BoundInfo(-2.0f, 1.0f, -1.0f, 1.0f, 12, 8)) {}
 };
 
 // julia set. instead of varying c, vary z and provide a constant c.
@@ -341,10 +346,11 @@ class Julia : public ComplexQuadraticPolynomial {
   }
 
 public:
+  // call parent constructor with bounds info. also log the value of c
   Julia(float c_real, float c_imag) :
+    ComplexQuadraticPolynomial(BoundInfo(-2.0f, 2.0f, -1.5f, 1.5f, 12, 9)),
     c_real(c_real),
     c_imag(c_imag)
-    //box(-2.0f, 2.0f, -1.5f, 1.5f, 2, 2)
   {}
 };
 
