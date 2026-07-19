@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <cstring>
 #include <immintrin.h>
 
 // everything is done in computation blocks.
@@ -11,8 +10,13 @@
 #define BLOCK_HEIGHT   4
 #define BLOCK_N_CELLS 16
 
-#define CELL_STR "  "
-#define CELL_N_CHARS std::strlen(CELL_STR)
+#define BORDER_TOP_LEFT "┌"
+#define BORDER_TOP_RIGHT "┐"
+#define BORDER_SIDE "│"
+
+#define CELL_FULL_STR " "
+#define CELL_HALF_STR "▄"
+#define CELL_N_CHARS 1
 
 // wrapper around bts instruction. inline so it gets optimised away.
 inline bool bit_test_and_set_high(const void *src, unsigned int bit) {

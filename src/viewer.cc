@@ -61,7 +61,7 @@ void Viewer::walk() const {
   for (int re = 0; re < BLOCK_WIDTH; re++) {
     for (int im = 0; im < BLOCK_HEIGHT; im++) {
       real_block[re + im*BLOCK_HEIGHT] = this->bounds.left + (re * this->bounds.real_sep()); // + real_sep for each re
-      imag_block[re + im*BLOCK_HEIGHT] = this->bounds.top   + (im * this->bounds.imag_sep());
+      imag_block[re + im*BLOCK_HEIGHT] = this->bounds.top  + (im * this->bounds.imag_sep());
     }
   }
 
@@ -76,28 +76,48 @@ void Viewer::walk() const {
 }
 
 void Viewer::draw() const {
-  printf("\033[90m| ");
+  // left corner on top edge
+  printf("\033[90m" BORDER_TOP_LEFT " ");
+
   // print bounds
   int width; // do not initialise: that will happen in the printf %n
   printf("%f%n", this->bounds.left, &width);
   width = (CELL_N_CHARS * BLOCK_WIDTH * this->bounds.n_blocks_x) - width - 2; // subtract from how wise our render is in the first place. - 2 for padding
-  printf("%*f |\n", width, this->bounds.right);
+  printf("%*f " BORDER_TOP_RIGHT "\n", width, this->bounds.right);
 
-  for (unsigned int y = 0; y < (this->bounds.n_blocks_y * BLOCK_HEIGHT); ++y) {
-    putchar('|');
+  for (unsigned int y = 0; y < (this->bounds.n_blocks_y * BLOCK_HEIGHT); y += 2) {
+    fputs(BORDER_SIDE, stdout);
     for (unsigned int x = 0; x < (this->bounds.n_blocks_x * BLOCK_WIDTH); ++x) {
       unsigned block_id = (x / BLOCK_WIDTH) + (this->bounds.n_blocks_x * (y / BLOCK_HEIGHT));
       unsigned block_cell = (x % BLOCK_WIDTH) + (BLOCK_WIDTH * (y % BLOCK_HEIGHT));
 
-      hue_t colour = this->huebuf.hues[block_cell + (block_id * BLOCK_N_CELLS)];
+      // for double density, a bottom-half block is shown, with background being top colour, and foreground being bottom colour.
+      // two cells' colour, top and bottom.
+      // HACK: we can safely assume that y is always even so thus will never straddle the border between blocks
+      // this allows us to just simply add BLOCK_WIDTH to the index to get the one beneath
+      hue_t col_hi = this->huebuf.hues[block_cell + (block_id * BLOCK_N_CELLS)];
+      hue_t col_lo = this->huebuf.hues[block_cell + (block_id * BLOCK_N_CELLS) + BLOCK_WIDTH];
 
-      if (colour) {
-        printf("\033[48;2;6;%u;6m" CELL_STR, -((signed) colour) & 0xff);
-      } else {
-        printf("\033[40m" CELL_STR);
+      // draw cells. we use one sequence for both background and foreground.
+      // we start with background, and if needed the foreground completes it.
+      // NOTE: fputs is used to circumvent puts' implicit \n after the string
+
+      // if top cell is not 0, write rgb(10, hue, 10), otherwise all black (40 is black bg).
+      if (col_hi) printf("\033[48;2;10;%u;10", -((signed) col_hi) & 0xff);
+      else fputs("\033[40", stdout);
+      // if top and bottom are equal, i.e. no separate foreground needed
+      if (col_hi == col_lo) {
+        fputs("m" CELL_FULL_STR, stdout); // complete sequence; do nothing more, and put a space
+      } else { // otherwise, separate foreground
+        // complete ansi sequence.
+        // if bottom cell is not 0, write rgb(10, hue, 10), otherwise all black (30 is black fg)
+        if (col_lo) printf(";38;2;10;%u;10m" CELL_HALF_STR, -((signed) col_lo) & 0xff);
+        else fputs(";30m" CELL_HALF_STR, stdout);
       }
     }
-    printf("\033[40m|");
+
+    // border. 40 = black bg, 90 = bright black (i.e. dark grey) fg
+    printf("\033[40;90m" BORDER_SIDE);
     if (y == 0) { // first one
       printf(" %f", this->bounds.top);
     } else if (y + 1 == this->bounds.n_blocks_y * BLOCK_HEIGHT) { // last one

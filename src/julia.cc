@@ -28,7 +28,7 @@ constexpr float Julia::squared_escape_radius() const {
 }
 
 Julia::Julia(float c_real, float c_imag) :
-  ComplexQuadratic(BoundInfo(-2.0f, 2.0f, -1.5f, 1.5f, 12, 9)),
+  ComplexQuadratic(BoundInfo(-2.0f, 2.0f, -1.5f, 1.5f, 24, 18)),
   c_real(c_real),
   c_imag(c_imag)
 {}

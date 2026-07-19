@@ -4,7 +4,6 @@
 #include "include/mandelbrot.hh"
 #include "include/julia.hh"
 
-
 int main(int argc, char *argv[]) {
   if (argc <= 1) {
 usage:
