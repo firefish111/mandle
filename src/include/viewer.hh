@@ -16,7 +16,12 @@
 
 #define CELL_FULL_STR " "
 #define CELL_HALF_STR "▄"
+// strlen won't work because unicode (grrrr)
 #define CELL_N_CHARS 1
+
+// how many cells per character
+#define X_DENSITY 1
+#define Y_DENSITY 2
 
 // wrapper around bts instruction. inline so it gets optimised away.
 inline bool bit_test_and_set_high(const void *src, unsigned int bit) {
@@ -59,11 +64,13 @@ protected:
 
     // need to be const as only const methods can be called in a const method
     constexpr float real_sep() const {
-      return (this->right - this->left) / this->n_blocks_x / BLOCK_WIDTH;
+      // subtract one from number of cells to draw to ensure range is inclusive at both ends, making x-axis symmetry more obvious
+      return (this->right - this->left) / (this->n_blocks_x * BLOCK_WIDTH - 1);
     }
 
     constexpr float imag_sep() const {
-      return (this->bottom - this->top) / this->n_blocks_y / BLOCK_HEIGHT;
+      // ditto
+      return (this->bottom - this->top) / (this->n_blocks_y * BLOCK_HEIGHT - 1);
     }
   };
 

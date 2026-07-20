@@ -3,6 +3,9 @@
 
 #include "include/viewer.hh"
 
+// NOTE: helper macro to avoid implicit \n from normal puts
+#define putstr(s) fputs(s, stdout)
+
 // walk dfs helper function. initially called in other overload
 void Viewer::walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) const {
   // block_x and block_y are which block we are pointing to. we convert this to a linear
@@ -85,9 +88,9 @@ void Viewer::draw() const {
   width = (CELL_N_CHARS * BLOCK_WIDTH * this->bounds.n_blocks_x) - width - 2; // subtract from how wise our render is in the first place. - 2 for padding
   printf("%*f " BORDER_TOP_RIGHT "\n", width, this->bounds.right);
 
-  for (unsigned int y = 0; y < (this->bounds.n_blocks_y * BLOCK_HEIGHT); y += 2) {
-    fputs(BORDER_SIDE, stdout);
-    for (unsigned int x = 0; x < (this->bounds.n_blocks_x * BLOCK_WIDTH); ++x) {
+  for (unsigned int y = 0; y < (this->bounds.n_blocks_y * BLOCK_HEIGHT); y += Y_DENSITY) {
+    putstr(BORDER_SIDE);
+    for (unsigned int x = 0; x < (this->bounds.n_blocks_x * BLOCK_WIDTH); x += X_DENSITY) {
       unsigned block_id = (x / BLOCK_WIDTH) + (this->bounds.n_blocks_x * (y / BLOCK_HEIGHT));
       unsigned block_cell = (x % BLOCK_WIDTH) + (BLOCK_WIDTH * (y % BLOCK_HEIGHT));
 
@@ -100,30 +103,31 @@ void Viewer::draw() const {
 
       // draw cells. we use one sequence for both background and foreground.
       // we start with background, and if needed the foreground completes it.
-      // NOTE: fputs is used to circumvent puts' implicit \n after the string
+      // NOTE: helper macro putstr (which invokes fputs) is used to circumvent puts' implicit \n after the string
 
       // if top cell is not 0, write rgb(10, hue, 10), otherwise all black (40 is black bg).
       if (col_hi) printf("\033[48;2;10;%u;10", -((signed) col_hi) & 0xff);
-      else fputs("\033[40", stdout);
+      else putstr("\033[40");
       // if top and bottom are equal, i.e. no separate foreground needed
       if (col_hi == col_lo) {
-        fputs("m" CELL_FULL_STR, stdout); // complete sequence; do nothing more, and put a space
+        putstr("m" CELL_FULL_STR); // complete sequence; do nothing more, and put a space
       } else { // otherwise, separate foreground
         // complete ansi sequence.
         // if bottom cell is not 0, write rgb(10, hue, 10), otherwise all black (30 is black fg)
         if (col_lo) printf(";38;2;10;%u;10m" CELL_HALF_STR, -((signed) col_lo) & 0xff);
-        else fputs(";30m" CELL_HALF_STR, stdout);
+        else putstr(";30m" CELL_HALF_STR);
       }
     }
 
     // border. 40 = black bg, 90 = bright black (i.e. dark grey) fg
     printf("\033[40;90m" BORDER_SIDE);
     if (y == 0) { // first one
-      printf(" %f", this->bounds.top);
-    } else if (y + 1 == this->bounds.n_blocks_y * BLOCK_HEIGHT) { // last one
-      printf(" %f", this->bounds.bottom);
+      printf(" %f", this->bounds.top); // print top bound
+    } else if (y + Y_DENSITY == this->bounds.n_blocks_y * BLOCK_HEIGHT) { // if we're on (or are just showing) the last row
+      printf(" %f", this->bounds.bottom); // print bottom bound
     }
-    putchar('\n');
+
+    putchar('\n'); // new line; next row
   }
 }
 
