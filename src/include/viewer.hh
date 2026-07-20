@@ -1,7 +1,9 @@
 #pragma once
 
+#include "terminal.hh"
 #include <cstdint>
 #include <immintrin.h>
+#include <utility>
 
 // everything is done in computation blocks.
 // the compute() function calculates an entire computation block at once through SIMD,
@@ -23,6 +25,9 @@
 #define X_DENSITY 1
 #define Y_DENSITY 2
 
+// IMPORTANT: whether to show border or not
+//#define SHOW_BORDER
+
 // wrapper around bts instruction. inline so it gets optimised away.
 inline bool bit_test_and_set_high(const void *src, unsigned int bit) {
   bool o;
@@ -33,10 +38,6 @@ inline bool bit_test_and_set_high(const void *src, unsigned int bit) {
       : "cc" );
   return o;
 }
-
-// 0 = tends to 0
-// 1-255 = tends to infinity, slowest = 1, fastest = 255
-typedef uint8_t hue_t;
 
 // abstract class for viewer of any type
 class Viewer {
@@ -53,25 +54,37 @@ protected:
   // info about the bounds of the window being created
   struct BoundInfo {
     // the edges of the viewport
-    float left;
-    float right;
-    float top;
-    float bottom;
+    const float left;
+    const float right;
+    const float top;
+    const float bottom;
 
     // the number of computation blocks across and down
-    uint8_t n_blocks_x;
-    uint8_t n_blocks_y;
+    const std::pair<size_t, size_t> rect_size_blks;
 
     // need to be const as only const methods can be called in a const method
     constexpr float real_sep() const {
       // subtract one from number of cells to draw to ensure range is inclusive at both ends, making x-axis symmetry more obvious
-      return (this->right - this->left) / (this->n_blocks_x * BLOCK_WIDTH - 1);
+      return (this->right - this->left) / (this->rect_size_blks.first * BLOCK_WIDTH - 1);
     }
 
     constexpr float imag_sep() const {
       // ditto
-      return (this->bottom - this->top) / (this->n_blocks_y * BLOCK_HEIGHT - 1);
+      return (this->bottom - this->top) / (this->rect_size_blks.second * BLOCK_HEIGHT - 1);
     }
+
+    BoundInfo(float left, float right, float top, float bottom, uint8_t aspect_ratio_x, uint8_t aspect_ratio_y) :
+      left(left),
+      right(right),
+      top(top),
+      bottom(bottom),
+      rect_size_blks( // largest possible rectangle of given aspect ratio, with blocks of the given size
+        Terminal::get_maximum_dimensions(
+          aspect_ratio_x, aspect_ratio_y,
+          BLOCK_WIDTH / X_DENSITY, BLOCK_HEIGHT / Y_DENSITY
+        )
+      )
+    {}
   };
 
   const struct BoundInfo bounds;

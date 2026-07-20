@@ -19,5 +19,5 @@ constexpr float Mandelbrot::squared_escape_radius() const {
 
 // call parent constructor with bounds info
 Mandelbrot::Mandelbrot() :
-  ComplexQuadratic(BoundInfo(-2.0f, 1.0f, -1.0f, 1.0f, 24, 16))
+  ComplexQuadratic(BoundInfo(-2.0f, 1.0f, -1.0f, 1.0f, 3, 2))
 {}
