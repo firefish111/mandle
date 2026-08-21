@@ -59,8 +59,8 @@ void Viewer::walk() const {
   // 0+2i 1+2i 2+2i 3+2i
   // 0+3i 1+3i 2+3i 3+3i
   // where each difference down is imag_sep
-  for (int re = 0; re < BLOCK_WIDTH; re++) {
-    for (int im = 0; im < BLOCK_HEIGHT; im++) {
+  for (unsigned re = 0; re < BLOCK_WIDTH; re++) {
+    for (unsigned im = 0; im < BLOCK_HEIGHT; im++) {
       real_block[re + im*BLOCK_HEIGHT] = this->bounds.left + (re * this->bounds.real_sep()); // + real_sep for each re
       imag_block[re + im*BLOCK_HEIGHT] = this->bounds.top  + (im * this->bounds.imag_sep());
     }

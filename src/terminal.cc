@@ -9,7 +9,7 @@
 #include <utility>
 #include <algorithm>
 
-using namespace std;
+using std::size_t;
 
 namespace Terminal {
   void put_dual_cell(hue_t top, hue_t bottom) {
@@ -34,7 +34,7 @@ namespace Terminal {
   // Calculates the largest possible rectangle of given aspect ratio that can fit inside the current terminal window, with lengths given in blocks across and down.
   // Therefore also has to take the size of a block in characters, so as to be able to round to the nearest.
   // returns a pair (x,y) of the dimensions of this rectangle.
-  pair<size_t, size_t> get_maximum_dimensions(size_t aspect_ratio_x, size_t aspect_ratio_y, size_t block_size_x_chars, size_t block_size_y_chars) {
+  std::pair<size_t, size_t> get_maximum_dimensions(size_t aspect_ratio_x, size_t aspect_ratio_y, size_t block_size_x_chars, size_t block_size_y_chars) {
     // get size of terminal window in chars.
     struct winsize ws;
   #if 0
@@ -52,9 +52,9 @@ namespace Terminal {
 
     // get minimum between them, as that is largest possible number of aspect ratio subcells that can be fit orthogonally into terminal
     // to form a square of them (and thus the same aspect ratio as each individual subcell)
-    size_t common_factor = min(scaled_width, scaled_height);
+    size_t common_factor = std::min(scaled_width, scaled_height);
 
     // return pair
-    return make_pair(common_factor * aspect_ratio_x, common_factor * aspect_ratio_y);
+    return std::make_pair(common_factor * aspect_ratio_x, common_factor * aspect_ratio_y);
   }
 }

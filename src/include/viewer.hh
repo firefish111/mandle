@@ -29,7 +29,7 @@
 //#define SHOW_BORDER
 
 // wrapper around bts instruction. inline so it gets optimised away.
-inline bool bit_test_and_set_high(const void *src, unsigned int bit) {
+inline bool bit_test_and_set_high(const void *src, uint32_t bit) {
   bool o;
   asm volatile ("btsl %2, (%1)" :
       "=@ccc" (o)
@@ -56,8 +56,8 @@ protected:
     // the edges of the viewport
     const float left;
     const float right;
-    const float top;
     const float bottom;
+    const float top;
 
     // the number of computation blocks across and down
     const std::pair<size_t, size_t> rect_size_blks;
@@ -73,11 +73,11 @@ protected:
       return (this->bottom - this->top) / (this->rect_size_blks.second * BLOCK_HEIGHT - 1);
     }
 
-    BoundInfo(float left, float right, float top, float bottom, uint8_t aspect_ratio_x, uint8_t aspect_ratio_y) :
+    BoundInfo(float left, float right, float bottom, float top, uint8_t aspect_ratio_x, uint8_t aspect_ratio_y) :
       left(left),
       right(right),
-      top(top),
       bottom(bottom),
+      top(top),
       rect_size_blks( // largest possible rectangle of given aspect ratio, with blocks of the given size
         Terminal::get_maximum_dimensions(
           aspect_ratio_x, aspect_ratio_y,

@@ -12,11 +12,6 @@ Mandelbrot::InitialConditions Mandelbrot::initial(__m512 real_block, __m512 imag
   };
 }
 
-// set the escape radius to 2, as people with PhDs said so. we return this squared to ease computation
-constexpr float Mandelbrot::squared_escape_radius() const {
-  return 4.0f;
-}
-
 // call parent constructor with bounds info
 Mandelbrot::Mandelbrot() :
   ComplexQuadratic(BoundInfo(-2.0f, 1.0f, -1.0f, 1.0f, 3, 2))

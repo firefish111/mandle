@@ -26,7 +26,7 @@ private:
   // has to take a this pointer, but it is never used.
   // this is because static methods can't be virtual, as an upcast to a parent class
   // will result in the wrong static method being called
-  __m128i compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const;
+  __m128i compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const override;
 
   // force inherit constructor. this is because our children cannot inherit straight from Viewer
   using Viewer::Viewer;
