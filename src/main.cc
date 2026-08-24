@@ -1,6 +1,7 @@
 #include <cstdio>
 
 #include "include/viewer.hh"
+#include "include/terminal.hh"
 #include "include/mandelbrot.hh"
 #include "include/julia.hh"
 #include "include/douady_rabbit.hh"
@@ -16,19 +17,27 @@ usage:
   }
   // argc is guaranteed to be more than 1
 
+  Terminal::set_winsize();
+  Terminal::init_sigwinch();
+
   class Viewer *v = nullptr; // "nullptr is better" - c++ spec
-  if (argv[1][0] == 'm') {
-    v = new Mandelbrot();
-  } else if (argv[1][0] == 'j' && argc >= 4) {
-    v = new Julia(
-      strtof(argv[2], nullptr), // this function is kind enough to tell me where the float ends, but i don't care so nullptr it is
-      strtof(argv[3], nullptr)
-    );
-  } else if (argv[1][0] == 'd' && argv[1][1] == 'r') {
-    v = new DouadyRabbit();
-  } else {
-    goto usage;
-  }
+  try {
+    if (argv[1][0] == 'm') {
+      v = new Mandelbrot();
+    } else if (argv[1][0] == 'j' && argc >= 4) {
+      v = new Julia(
+        strtof(argv[2], nullptr), // this function is kind enough to tell me where the float ends, but i don't care so nullptr it is
+        strtof(argv[3], nullptr)
+      );
+    } else if (argv[1][0] == 'd' && argv[1][1] == 'r') {
+      v = new DouadyRabbit();
+    } else {
+      goto usage;
+    }
+  } catch (const char *msg) {
+    fprintf(stderr, "Failed to create viewer: %s\n", msg);
+    return 1;
+  };
 
   v->walk();
   v->draw();

@@ -103,7 +103,7 @@ void Viewer::draw() const {
       hue_t col_hi = this->huebuf.hues[block_cell + (block_id * BLOCK_N_CELLS)];
       hue_t col_lo = this->huebuf.hues[block_cell + (block_id * BLOCK_N_CELLS) + BLOCK_WIDTH];
 
-      Terminal::put_dual_cell(-((signed) col_hi), -((signed) col_lo));
+      Terminal::put_dual_cell(-((signed) col_hi), -((signed) col_lo), !(x == 0 && y == 0));
     }
 
   #ifdef SHOW_BORDER
@@ -123,7 +123,7 @@ void Viewer::draw() const {
   }
 }
 
-Viewer::Viewer(BoundInfo box) : bounds(box) {
+Viewer::Viewer(Terminal::BoundBox box) : bounds(box) {
   // doesn't matter which union element we use, but using xmmtab to demonstrate 16-alignment
   this->huebuf.xmmtab = (__m128i *) aligned_alloc(16, this->bounds.rect_size_blks.first * this->bounds.rect_size_blks.second * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
   this->visited = malloc(this->bounds.rect_size_blks.first * this->bounds.rect_size_blks.second / 8); // 8 bits per byte

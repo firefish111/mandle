@@ -1,4 +1,5 @@
 #include "include/mandelbrot.hh"
+#include "include/terminal.hh"
 
 Mandelbrot::InitialConditions Mandelbrot::initial(__m512 real_block, __m512 imag_block) const {
   // technically, for mandelbrot, initial z is 0.
@@ -14,5 +15,5 @@ Mandelbrot::InitialConditions Mandelbrot::initial(__m512 real_block, __m512 imag
 
 // call parent constructor with bounds info
 Mandelbrot::Mandelbrot() :
-  ComplexQuadratic(BoundInfo(-2.0f, 1.0f, -1.0f, 1.0f, 3, 2))
+  ComplexQuadratic(Terminal::BoundBox(-2.0f, 1.0f, -1.0f, 1.0f, 3, 2))
 {}
