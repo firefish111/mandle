@@ -24,6 +24,9 @@ usage:
   try {
     if (argv[1][0] == 'm') {
       v = new Mandelbrot();
+
+      v->bounds.zoom_in(1, 0);
+      v->bounds.zoom_in(2, 1);
     } else if (argv[1][0] == 'j' && argc >= 4) {
       v = new Julia(
         strtof(argv[2], nullptr), // this function is kind enough to tell me where the float ends, but i don't care so nullptr it is

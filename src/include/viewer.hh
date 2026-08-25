@@ -33,9 +33,10 @@ class Viewer {
   // bit vector
   void * visited;
 
-protected:
-  const struct Terminal::BoundBox bounds;
+public:
+  struct Terminal::BoundBox bounds;
 
+protected:
   // compute function. takes in one block, and returns table of hues for that block.
   virtual __m128i compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const = 0;
 
@@ -46,6 +47,6 @@ public:
   void walk() const;
   void draw() const;
 
-  Viewer(Terminal::BoundBox box);
+  Viewer(Terminal::Limits lim);
   ~Viewer();
 };
