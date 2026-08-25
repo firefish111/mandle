@@ -15,7 +15,7 @@ void Viewer::walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) 
   const auto size = this->bounds.get_size_blks();
   const auto [real_sep, imag_sep] = this->bounds.calculate_sep();
 
-  unsigned block_id = block_x + (block_y * size.first);
+  unsigned block_id = block_x + (block_y * size.x);
 
   // we set it to visited, but if it was already visited, we return
   bool was_visited = bit_test_and_set_high(this->visited, block_id);
@@ -26,7 +26,7 @@ void Viewer::walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) 
   // negate it to yield a 1-255 of how many iterations it took, whilst keeping 0 the same.
   this->huebuf.xmmtab[block_id] = this->compute(255, real, imag);
 
-  if (block_x + 1 < size.first) {
+  if (block_x + 1 < size.x) {
     /* recurse across in real direction */
     this->walk(
       block_x + 1,
@@ -36,7 +36,7 @@ void Viewer::walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) 
     );
   }
 
-  if (block_y + 1 < size.second) {
+  if (block_y + 1 < size.y) {
     /* recurse down in imaginary direction */
     this->walk(
       block_x,
@@ -56,7 +56,7 @@ void Viewer::walk() const {
   float real_block[16] __attribute__ ((aligned(64)));
   float imag_block[16] __attribute__ ((aligned(64)));
 
-  const Terminal::Limits& lim = this->bounds.lim();
+  const terminal::Limits& lim = this->bounds.lim();
   const auto [real_sep, imag_sep] = this->bounds.calculate_sep();
 
   // create 4x4 block, starting with this->bounds.top and this->bounds.left like so:
@@ -83,11 +83,13 @@ void Viewer::walk() const {
 }
 
 void Viewer::draw() const {
+  terminal::clear_scr();
+
   const auto size = this->bounds.get_size_blks();
-  for (unsigned int y = 0; y < (size.second * BLOCK_HEIGHT); y += Y_DENSITY) {
-    for (unsigned int x = 0; x < (size.first * BLOCK_WIDTH); x += X_DENSITY) {
-      unsigned block_id = (x / BLOCK_WIDTH) + (size.first * (y / BLOCK_HEIGHT));
-      unsigned block_cell = (x % BLOCK_WIDTH) + (BLOCK_WIDTH * (y % BLOCK_HEIGHT));
+  for (size_t y = 0; y < (size.y * BLOCK_HEIGHT); y += Y_DENSITY) {
+    for (size_t x = 0; x < (size.x * BLOCK_WIDTH); x += X_DENSITY) {
+      size_t block_id = (x / BLOCK_WIDTH) + (size.x * (y / BLOCK_HEIGHT));
+      size_t block_cell = (x % BLOCK_WIDTH) + (BLOCK_WIDTH * (y % BLOCK_HEIGHT));
 
       // for double density, a bottom-half block is shown, with background being top colour, and foreground being bottom colour.
       // two cells' colour, top and bottom.
@@ -96,7 +98,7 @@ void Viewer::draw() const {
       hue_t col_hi = this->huebuf.hues[block_cell + (block_id * BLOCK_N_CELLS)];
       hue_t col_lo = this->huebuf.hues[block_cell + (block_id * BLOCK_N_CELLS) + BLOCK_WIDTH];
 
-      Terminal::put_dual_cell(-((signed) col_hi), -((signed) col_lo), !(x == 0 && y == 0));
+      terminal::put_dual_cell(-((signed) col_hi), -((signed) col_lo), !(x == 0 && y == 0));
     }
 
     // reset all style
@@ -106,11 +108,11 @@ void Viewer::draw() const {
   }
 }
 
-Viewer::Viewer(Terminal::Limits lim) : bounds(lim) {
+Viewer::Viewer(terminal::Limits lim) : bounds(lim) {
   const auto size = this->bounds.get_size_blks();
   // doesn't matter which union element we use, but using xmmtab to demonstrate 16-alignment
-  this->huebuf.xmmtab = (__m128i *) aligned_alloc(16, size.first * size.second * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
-  this->visited = malloc(size.first * size.second / 8); // 8 bits per byte
+  this->huebuf.xmmtab = (__m128i *) aligned_alloc(16, size.x * size.y * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
+  this->visited = malloc(size.x * size.y / 8); // 8 bits per byte
 }
 
 Viewer::~Viewer() {

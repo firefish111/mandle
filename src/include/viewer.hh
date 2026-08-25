@@ -8,9 +8,6 @@
 #define BORDER_TOP_RIGHT "┐"
 #define BORDER_SIDE "│"
 
-// IMPORTANT: whether to show border or not
-#undef SHOW_BORDER
-
 // wrapper around bts instruction. inline so it gets optimised away.
 inline bool bit_test_and_set_high(const void *src, uint32_t bit) {
   bool o;
@@ -34,7 +31,7 @@ class Viewer {
   void * visited;
 
 public:
-  struct Terminal::BoundBox bounds;
+  struct terminal::BoundBox bounds;
 
 protected:
   // compute function. takes in one block, and returns table of hues for that block.
@@ -47,6 +44,6 @@ public:
   void walk() const;
   void draw() const;
 
-  Viewer(Terminal::Limits lim);
+  Viewer(terminal::Limits lim);
   ~Viewer();
 };

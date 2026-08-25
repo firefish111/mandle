@@ -15,5 +15,5 @@ Mandelbrot::InitialConditions Mandelbrot::initial(__m512 real_block, __m512 imag
 
 // call parent constructor with bounds info
 Mandelbrot::Mandelbrot() :
-  ComplexQuadratic(Terminal::Limits(-2.0f, 1.0f, -1.0f, 1.0f, 3, 2))
+  ComplexQuadratic(terminal::Limits(-2.0f, 1.0f, -1.0f, 1.0f, 3, 2))
 {}

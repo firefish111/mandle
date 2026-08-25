@@ -1,19 +1,16 @@
-#include "include/viewer.hh"
 #include "include/terminal.hh"
 
 #include <cstdio>
-#include <csignal>
 
 #include <unistd.h>
 #include <termios.h>
 #include <sys/ioctl.h>
 
-#include <utility>
 #include <algorithm>
 
 using std::size_t;
 
-namespace Terminal {
+namespace terminal {
   void put_dual_cell(hue_t top, hue_t bottom, bool reset) {
     static hue_t prev_top = 0, prev_bottom = 0;
 
@@ -21,7 +18,8 @@ namespace Terminal {
     // we start with background, and if needed the foreground completes it.
     // NOTE: helper macro putstr (which invokes fputs) is used to circumvent puts' implicit \n after the string
 
-    bool putting_top = (top != prev_top || reset), putting_bottom = (bottom != prev_bottom || reset);
+    bool putting_top = (top != prev_top || reset),
+         putting_bottom = (bottom != prev_bottom || reset);
 
     if (putting_top || putting_bottom) {
       /* background */
@@ -70,14 +68,10 @@ namespace Terminal {
     #endif
   }
 
-  void init_sigwinch() {
-    std::signal(SIGWINCH, set_winsize);
-  }
-
   // Calculates the largest possible rectangle of given aspect ratio that can fit inside the current terminal window, with lengths given in blocks across and down.
   // Therefore also has to take the size of a block in characters, so as to be able to round to the nearest.
   // returns a pair (x,y) of the dimensions of this rectangle.
-  std::pair<size_t, size_t> get_maximum_dimensions(size_t aspect_ratio_x, size_t aspect_ratio_y, size_t block_size_x_chars, size_t block_size_y_chars) {
+  offset_t<size_t> get_maximum_dimensions(size_t aspect_ratio_x, size_t aspect_ratio_y, size_t block_size_x_chars, size_t block_size_y_chars) {
     // convert terminal to maximum number of clean multiples of our aspect ratio
     size_t scaled_width  = (ws.ws_col / aspect_ratio_x) / block_size_x_chars;
     size_t scaled_height = (ws.ws_row / aspect_ratio_y) / block_size_y_chars;
@@ -87,6 +81,6 @@ namespace Terminal {
     size_t common_factor = std::min(scaled_width, scaled_height);
 
     // return pair
-    return std::make_pair(common_factor * aspect_ratio_x, common_factor * aspect_ratio_y);
+    return {common_factor * aspect_ratio_x, common_factor * aspect_ratio_y};
   }
 }

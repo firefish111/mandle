@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <utility>
 
+#include <cstdio>
 #include <stack>
 #include <vector>
 
@@ -30,21 +30,33 @@
 // 1-255 = tends to infinity, slowest = 1, fastest = 255
 typedef uint8_t hue_t;
 
+
 // NOTE: helper macro to avoid implicit \n from normal puts
 #define putstr(s) fputs(s, stdout)
 
 using std::size_t;
 
 // Functions that involve the terminal
-namespace Terminal {
+namespace terminal {
+  // generic offset struct
+  // structs have default visibility public
+  template <typename T>
+  struct offset_t {
+    T x;
+    T y;
+  };
+
+  inline void clear_scr() {
+    putstr("\033[2J\033H");
+  }
+
   void put_dual_cell(hue_t top, hue_t bottom, bool reset);
 
   // unused parameter int for signal. we don't care, so it remains unnamed.
   // we have to declare it here, because of mangler and overloading
   void set_winsize(int = 0);
-  void init_sigwinch();
 
-  std::pair<size_t, size_t> get_maximum_dimensions(
+  offset_t<size_t> get_maximum_dimensions(
     size_t aspect_ratio_x, size_t aspect_ratio_y,
     size_t block_size_x_chars, size_t block_size_y_chars
   );
@@ -55,7 +67,7 @@ namespace Terminal {
     const float right;
     const float bottom;
     const float top;
-    const std::pair<uint8_t, uint8_t> aspect_ratio;
+    const offset_t<uint8_t> aspect_ratio;
 
     Limits(
       float left,
@@ -78,15 +90,15 @@ namespace Terminal {
     std::stack<Limits, std::vector<Limits>> viewport;
 
     // the number of computation blocks across and down
-    const std::pair<size_t, size_t> rect_size_blks;
+    const offset_t<size_t> rect_size_blks;
 
     // ditto, but for layers deeper than top layer.
     // top layer may not be square, but we can guarantee that lower ones are
-    const std::pair<size_t, size_t> square_size_blks;
+    const offset_t<size_t> square_size_blks;
 
   public:
     const Limits& lim() const;
-    const std::pair<size_t, size_t>& get_size_blks() const;
+    const offset_t<size_t>& get_size_blks() const;
 
     void zoom_in(size_t subsquare_x, size_t subsquare_y);
     //void zoom_in(char label);
@@ -94,7 +106,7 @@ namespace Terminal {
 
     // get the separators between pixels, as a pair of (real, imag)
     // done as one function to minimise repeated calls to get_size_blks() and lim()
-    std::pair<float, float> calculate_sep() const;
+    const offset_t<float> calculate_sep() const;
 
     BoundBox(Limits master);
   };
