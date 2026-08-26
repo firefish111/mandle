@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #include "include/viewer.hh"
 #include "include/terminal.hh"
@@ -58,6 +59,7 @@ void Viewer::walk() const {
 
   const terminal::Limits& lim = this->bounds.lim();
   const auto [real_sep, imag_sep] = this->bounds.calculate_sep();
+  const auto size = this->bounds.get_size_blks();
 
   // create 4x4 block, starting with this->bounds.top and this->bounds.left like so:
   // 0+0i 1+0i 2+0i 3+0i, where each difference across is real_sep
@@ -71,6 +73,9 @@ void Viewer::walk() const {
       imag_block[re + im*BLOCK_HEIGHT] = lim.top  + (im * imag_sep);
     }
   }
+
+  // zeroise visited list
+  memset(this->visited, 0, size.x * size.y / 8);
 
   // *actually* do the search, by invoking our recursive function
   // start from top left, and crawl downwards and rightwards

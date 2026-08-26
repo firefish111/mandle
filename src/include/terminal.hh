@@ -3,7 +3,6 @@
 #include <cstdint>
 
 #include <cstdio>
-#include <stack>
 #include <vector>
 
 // everything is done in computation blocks.
@@ -87,7 +86,7 @@ namespace terminal {
     //
     // stack is a container adaptor, that sits infront of an existing container and provides an interface for it
     // by default it uses a deque, which is better for reallocs but worse for speed, so we tell it to use a vector instead
-    std::stack<Limits, std::vector<Limits>> viewport;
+    std::vector<Limits> viewport;
 
     // the number of computation blocks across and down
     const offset_t<size_t> rect_size_blks;
@@ -101,7 +100,7 @@ namespace terminal {
     const offset_t<size_t>& get_size_blks() const;
 
     void zoom_in(size_t subsquare_x, size_t subsquare_y);
-    //void zoom_in(char label);
+    void zoom_in(char label);
     void zoom_out();
 
     // get the separators between pixels, as a pair of (real, imag)
