@@ -31,7 +31,7 @@ class Viewer {
   void * visited;
 
 public:
-  struct terminal::BoundBox bounds;
+  terminal::BoundBox bounds;
 
 protected:
   // compute function. takes in one block, and returns table of hues for that block.

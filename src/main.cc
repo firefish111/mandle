@@ -11,15 +11,11 @@
 #include <string>
 #include <iostream>
 
-// deal with SIGWINCH
-void init_sigwinch() {
-  std::signal(SIGWINCH, terminal::set_winsize);
-
-  /* NOTE:
-   * this is actually useless, as boundbox has no easy way of updating ALL viewports
-   * en masse, especially if zoomed in really far (will be VERY slow on each SIGWINCH).
-   * therefore, this SIGWINCH handler only exists for completeness' sake.
-   */
+// handle an illegal instruction (because computation failed)
+void handle_sigill(int) {
+  fprintf(stderr, "This program relies on AVX-512 instructions to speed up computation.\n"
+    "If you see this error, it means that your CPU does not support them, so cannot continue.\n");
+  exit(1);
 }
 
 int main(int argc, char *argv[]) {
@@ -34,7 +30,20 @@ usage:
   // argc is guaranteed to be more than 1
 
   terminal::set_winsize();
-  init_sigwinch();
+
+  // deal with signals
+  {
+    /* NOTE: SIGWINCH handler
+     * this is actually useless, as boundbox has no easy way of updating ALL viewports
+     * en masse, especially if zoomed in really far (will be VERY slow on each SIGWINCH),
+     * especially if you consider that there may be multiple SIGWINCHes as window sizing is not instant.
+     * therefore, this SIGWINCH handler only exists for completeness' sake.
+     */
+    std::signal(SIGWINCH, terminal::set_winsize);
+
+    // handle what happens if we hit an illegal instruction (not an avx-512-compatible cpu)
+    std::signal(SIGILL, handle_sigill);
+  }
 
   Viewer *v = nullptr; // "nullptr is better" - c++ spec
   if (argv[1][0] == 'm') {
