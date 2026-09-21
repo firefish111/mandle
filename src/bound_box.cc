@@ -1,6 +1,7 @@
 #include "include/terminal.hh"
 
 #include <algorithm>
+#include <cstring>
 #include <stdexcept>
 
 #define KEYBOARD_WIDTH  10
@@ -70,6 +71,21 @@ namespace terminal {
     }
   }
 
+  void BoundBox::initialise_visited_from_top() {
+    auto [x, y] = this->get_size_blks();
+    size_t area = x * y;
+    // ceiling divide area by 8
+    size_t new_size = (area / 8) + !!(area % 8);
+
+    // realloc
+    this->visited = realloc(this->visited, new_size);
+    visited_size = new_size;
+  }
+
+  void BoundBox::clear_visited() const {
+    memset(this->visited, 0, this->visited_size);
+  }
+
   // gets separator as pair (real, imag)
   // needs to be const as only const methods can be called in a const method
   const offset_t<float> BoundBox::calculate_sep() const {
@@ -101,9 +117,16 @@ namespace terminal {
 
     this->viewport.push_back(master); // push master onto stack
 
+    // this will work, as realloc(nullptr, sz) == malloc(sz)
+    this->initialise_visited_from_top();
+
     if ((this->rect_size_blks.x == 0 || this->rect_size_blks.y == 0) ||
        (this->square_size_blks.x == 0 || this->square_size_blks.y == 0)) {
       throw std::runtime_error("Cannot create BoundBox with width or height 0; failed to get terminal size or terminal too small");
     }
+  }
+
+  BoundBox::~BoundBox() {
+    free(this->visited);
   }
 }

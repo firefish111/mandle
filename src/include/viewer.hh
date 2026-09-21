@@ -27,9 +27,6 @@ class Viewer {
   };
   union HueTable huebuf;
 
-  // bit vector
-  void * visited;
-
 public:
   terminal::BoundBox bounds;
 

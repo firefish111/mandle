@@ -84,8 +84,7 @@ namespace terminal {
     // the edges of the viewport
     // the first element is the master dimensions: i.e. the main dimensions
     //
-    // stack is a container adaptor, that sits infront of an existing container and provides an interface for it
-    // by default it uses a deque, which is better for reallocs but worse for speed, so we tell it to use a vector instead
+    // std::stack is terrible, as it hides the .reserve() method
     std::vector<Limits> viewport;
 
     // the number of computation blocks across and down
@@ -96,6 +95,13 @@ namespace terminal {
     const offset_t<size_t> square_size_blks;
 
   public:
+    // keep a visited list. this is realloc'd on push
+    void * visited;
+
+  private:
+    size_t visited_size;
+
+  public:
     const Limits& lim() const;
     const offset_t<size_t>& get_size_blks() const;
 
@@ -103,10 +109,14 @@ namespace terminal {
     void zoom_in(char label);
     void zoom_out();
 
+    void initialise_visited_from_top();
+    void clear_visited() const;
+
     // get the separators between pixels, as a pair of (real, imag)
     // done as one function to minimise repeated calls to get_size_blks() and lim()
     const offset_t<float> calculate_sep() const;
 
     BoundBox(Limits master);
+    ~BoundBox();
   };
 }

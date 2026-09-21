@@ -19,7 +19,7 @@ void Viewer::walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) 
   unsigned block_id = block_x + (block_y * size.x);
 
   // we set it to visited, but if it was already visited, we return
-  bool was_visited = bit_test_and_set_high(this->visited, block_id);
+  bool was_visited = bit_test_and_set_high(this->bounds.visited, block_id);
   if (was_visited) return;
 
   // do 255 iterations. the function writes to its out buffer how many iterations are left
@@ -49,7 +49,7 @@ void Viewer::walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) 
 }
 
 // publicly available, begin walking.
-// this generates the starting conditions for the privvate helper function
+// this generates the starting conditions for the private helper function
 void Viewer::walk() const {
   // to be loaded into a zmm register, it needs to be 64-byte aligned
   // instead of setting them to tyoe __m512 right away, we want to set it to some values,
@@ -59,7 +59,6 @@ void Viewer::walk() const {
 
   const terminal::Limits& lim = this->bounds.lim();
   const auto [real_sep, imag_sep] = this->bounds.calculate_sep();
-  const auto size = this->bounds.get_size_blks();
 
   // create 4x4 block, starting with this->bounds.top and this->bounds.left like so:
   // 0+0i 1+0i 2+0i 3+0i, where each difference across is real_sep
@@ -75,7 +74,7 @@ void Viewer::walk() const {
   }
 
   // zeroise visited list
-  memset(this->visited, 0, size.x * size.y / 8);
+  this->bounds.clear_visited();
 
   // *actually* do the search, by invoking our recursive function
   // start from top left, and crawl downwards and rightwards
@@ -117,10 +116,8 @@ Viewer::Viewer(terminal::Limits lim) : bounds(lim) {
   const auto size = this->bounds.get_size_blks();
   // doesn't matter which union element we use, but using xmmtab to demonstrate 16-alignment
   this->huebuf.xmmtab = (__m128i *) aligned_alloc(16, size.x * size.y * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
-  this->visited = malloc(size.x * size.y / 8); // 8 bits per byte
 }
 
 Viewer::~Viewer() {
   free(this->huebuf.xmmtab);
-  free(this->visited);
 }

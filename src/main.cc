@@ -4,9 +4,9 @@
 #include "include/julia.hh"
 #include "include/douady_rabbit.hh"
 
+#include <cctype>
 #include <cstdio>
 #include <csignal>
-#include <cstring>
 
 #include <string>
 #include <iostream>
@@ -65,13 +65,18 @@ usage:
     v->draw();
 
     std::cout << "> ";
-    std::cin >> inbuf;
+    std::getline(std::cin, inbuf);
 
     if (inbuf.empty()) {
       break; // exit clause: empty line
     }
 
     for (char c : inbuf) {
+      // whitespace
+      if (std::isspace(c)) {
+        continue;
+      }
+
       if (c == '\\') {
         v->bounds.zoom_out();
         continue;
@@ -80,6 +85,9 @@ usage:
       // zoom in
       v->bounds.zoom_in(c);
     }
+
+    // zoom has changed if we get to here, therefore we reinitialise visited
+    v->bounds.initialise_visited_from_top();
   }
 
   return 0;
