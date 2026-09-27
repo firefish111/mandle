@@ -1,6 +1,6 @@
 #include "include/complex_quadratic.hh"
 
-__m128i ComplexQuadratic::compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const {
+__m128i ComplexQuadratic::compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const noexcept {
   // what we want to do is z <- z^2 + c, where z,c \in \mathbb{C}.
   // because they're both complex, we have to do slightly different things to both the real and imaginary components.
   // there is an intrinsic for complex multiplication, but it's only available on the fanciest xeons, and operates only on half floats, so we do it ourselves

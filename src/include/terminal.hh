@@ -37,6 +37,13 @@ using std::size_t;
 
 // Functions that involve the terminal
 namespace terminal {
+  enum Direction {
+    NORTH,
+    SOUTH,
+    EAST,
+    WEST,
+  };
+
   // generic offset struct
   // structs have default visibility public
   template <typename T>
@@ -62,10 +69,10 @@ namespace terminal {
 
   // helper struct for limits on each axis
   struct Limits {
-    const float left;
-    const float right;
-    const float bottom;
-    const float top;
+    float left;
+    float right;
+    float bottom;
+    float top;
     const offset_t<uint8_t> aspect_ratio;
 
     Limits(
@@ -76,6 +83,10 @@ namespace terminal {
       uint8_t aspect_ratio_x,
       uint8_t aspect_ratio_y
     );
+
+    // to nudge in a direction.
+    // we return a reference to this to allow daisy chaining of operators (mostly by convention)
+    Limits& operator+=(Direction d);
   };
 
   // info about the bounds of the window being created
@@ -108,6 +119,10 @@ namespace terminal {
     void zoom_in(size_t subsquare_x, size_t subsquare_y);
     void zoom_in(char label);
     void zoom_out();
+
+    inline void nudge(Direction d) {
+      this->viewport.back() += d;
+    }
 
     void initialise_visited_from_top();
     void clear_visited() const;

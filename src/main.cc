@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <csignal>
 
+#include <format>
+#include <stdexcept>
 #include <string>
 #include <iostream>
 
@@ -60,9 +62,17 @@ usage:
   }
 
   std::string inbuf;
+
+  // buffer errors to show after draw
+  std::string errorbuf;
+
   for (;;) {
     v->walk();
     v->draw();
+
+    // spit out buffer
+    std::cerr << errorbuf;
+    errorbuf.clear();
 
     std::cout << "> ";
     std::getline(std::cin, inbuf);
@@ -77,15 +87,43 @@ usage:
         continue;
       }
 
-      if (c == '\\') {
+      switch (c) {
+      case '\\':
         v->bounds.zoom_out();
-        continue;
-      }
+        break;
+      case '+': // camera up: view moves south
+        v->bounds.nudge(terminal::SOUTH);
+        break;
+      case '-': // camera down: view nmoves orth
+        v->bounds.nudge(terminal::NORTH);
+        break;
+      case '<': // camera left: view moves west
+        v->bounds.nudge(terminal::WEST);
+        break;
+      case '>': // camera right: view moves east
+        v->bounds.nudge(terminal::EAST);
+        break;
+      default:
+        // zoom in
+        try {
+          v->bounds.zoom_in(c);
+        } catch (const std::invalid_argument& e) {
+          // buffer the error to be shown *after* next draw, as otherwise it won't be visible
+          // format into end of error buffer, to avoid reallocations
+          std::format_to(std::back_inserter(errorbuf), "Error: {}\n", e.what());
 
-      // zoom in
-      v->bounds.zoom_in(c);
+          // whilst it would be good to have transactions, it gets really complicated with copying the boundbox,
+          // as it contains a raw (non-owning) pointer to a visited list, that may get realloc'd in the copy,
+          // complete breaking everything. so we just stop listening after the error, and reset to after the char loop,
+          // using a goto because labelled break doesn't exist.
+          //
+          // it's not a bug, it's a feature.
+          goto after_char_loop;
+        }
+      }
     }
 
+  after_char_loop:
     // zoom has changed if we get to here, therefore we reinitialise visited
     v->bounds.initialise_visited_from_top();
   }

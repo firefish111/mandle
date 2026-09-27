@@ -1,7 +1,7 @@
 #include "include/julia.hh"
 #include "include/terminal.hh"
 
-Julia::InitialConditions Julia::initial(__m512 real_block, __m512 imag_block) const {
+Julia::InitialConditions Julia::initial(__m512 real_block, __m512 imag_block) const noexcept {
   // parameters are given as what varies.
   // this varies z and sets c to our constant
   return (InitialConditions) {

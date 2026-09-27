@@ -1,7 +1,7 @@
 #include "include/mandelbrot.hh"
 #include "include/terminal.hh"
 
-Mandelbrot::InitialConditions Mandelbrot::initial(__m512 real_block, __m512 imag_block) const {
+Mandelbrot::InitialConditions Mandelbrot::initial(__m512 real_block, __m512 imag_block) const noexcept {
   // technically, for mandelbrot, initial z is 0.
   // but, after first iteration, z will always equal c, so we can optimise away first iteration,
   // by setting BOTH values to the same thing
@@ -15,5 +15,5 @@ Mandelbrot::InitialConditions Mandelbrot::initial(__m512 real_block, __m512 imag
 
 // call parent constructor with bounds info
 Mandelbrot::Mandelbrot() :
-  ComplexQuadratic(terminal::Limits(-2.0f, 1.0f, -1.0f, 1.0f, 3, 2))
+  ComplexQuadratic(terminal::Limits(-2.0f, 1.0f, -1.0f, 1.0f, 6, 4))
 {}

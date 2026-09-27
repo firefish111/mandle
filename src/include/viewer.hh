@@ -32,7 +32,7 @@ public:
 
 protected:
   // compute function. takes in one block, and returns table of hues for that block.
-  virtual __m128i compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const = 0;
+  virtual __m128i compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const noexcept = 0;
 
 private:
   void walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) const;

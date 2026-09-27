@@ -8,13 +8,13 @@ class Julia : public ComplexQuadratic {
   const float c_real;
   const float c_imag;
 
-  InitialConditions initial(__m512 real_block, __m512 imag_block) const override;
+  InitialConditions initial(__m512 real_block, __m512 imag_block) const noexcept override;
 
   // escape radius R > 0 must adhere to the following inequality: R^2 - R >= |c| given c.
   // we choose the smallest reasonable R by taking the ceiling
   // this is constexpr so we can afford to do some fancy things with operations
   // defined here, because contexpr implies inline, so as to not defy ODR
-  constexpr float squared_escape_radius() const override {
+  constexpr float squared_escape_radius() const noexcept override {
     // by completing the square, we get that: R >= 1/2 + sqrt(|c| + 1/4), taking the positive root as R > 0.
     // we take the ceil of that to get a reasonable value of R
 

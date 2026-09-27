@@ -19,6 +19,44 @@ namespace terminal {
     aspect_ratio(aspect_ratio_x, aspect_ratio_y)
   {}
 
+  // nudge towards the provided direction
+  Limits& Limits::operator+=(Direction d) {
+    // start with the fraction of the viewport which we want to move
+    float delta = 0.20;
+
+    switch (d) {
+      case WEST:
+        delta *= -1; // we are going negative
+        // fallthrough
+      case EAST:
+        /* x axis */
+
+        delta *= (right - left);
+
+        this->left += delta;
+        this->right += delta;
+
+        break;
+      case SOUTH:
+        delta *= -1; // we are going negative
+        // fallthrough
+      case NORTH:
+        /* y axis */
+
+        delta *= (bottom - top);
+
+        this->top += delta;
+        this->bottom += delta;
+
+        break;
+      default:
+        throw new std::invalid_argument("Invalid direction given to Limits::operator+(Direction)");
+    }
+
+    // get reference of this, to return from +=, as per convention
+    return *this;
+  }
+
   const Limits& BoundBox::lim() const {
     return this->viewport.back();
   }
