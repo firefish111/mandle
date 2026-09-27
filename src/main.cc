@@ -8,7 +8,7 @@
 #include <cstdio>
 #include <csignal>
 
-#include <format>
+#include <vector>
 #include <stdexcept>
 #include <string>
 #include <iostream>
@@ -64,17 +64,21 @@ usage:
   std::string inbuf;
 
   // buffer errors to show after draw
-  std::string errorbuf;
+  std::vector<const char *> errorbuf;
+  errorbuf.reserve(1); // we probably will only have at most one error, but we use a vector incase we have multiple
 
   for (;;) {
     v->walk();
     v->draw();
 
     // spit out buffer
-    std::cerr << errorbuf;
+    for (const char * err : errorbuf) {
+      std::cerr << "Error: " << err << std::endl;
+    }
     errorbuf.clear();
 
-    std::cout << "> ";
+    // read line from stdin
+    std::cout << "> " << std::flush;
     std::getline(std::cin, inbuf);
 
     if (inbuf.empty()) {
@@ -109,8 +113,8 @@ usage:
           v->bounds.zoom_in(c);
         } catch (const std::invalid_argument& e) {
           // buffer the error to be shown *after* next draw, as otherwise it won't be visible
-          // format into end of error buffer, to avoid reallocations
-          std::format_to(std::back_inserter(errorbuf), "Error: {}\n", e.what());
+          // write into end of error buffer, to avoid reallocations
+          errorbuf.push_back(e.what());
 
           // whilst it would be good to have transactions, it gets really complicated with copying the boundbox,
           // as it contains a raw (non-owning) pointer to a visited list, that may get realloc'd in the copy,
