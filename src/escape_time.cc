@@ -1,12 +1,41 @@
-#include "include/complex_quadratic.hh"
+#include "include/escape_time.hh"
+#include <immintrin.h>
 
-__m128i ComplexQuadratic::compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const noexcept {
+void EscapeTime::iterate(State * s, __mmask16 write_mask) const noexcept {
+  // z = z^2 + c. in other words:
+  // Re(z) = Re(z)^2 - Im(z)^2 + Re(c)
+  // Im(z) = 2 * Re(z) * Im(z) + Im(c)
+
+  // we don't set them right away, for two reasons: to add the masks later,
+  // and that Im(z) depends on Re(z), and we don't want this to be the new Re(z).
+  __m512 next_z_real = _mm512_add_ps(
+    _mm512_sub_ps(
+      _mm512_mul_ps(s->z_real, s->z_real), // optimiser is clever enough to squash this into a fused multiply-add instruction
+      _mm512_mul_ps(s->z_imag, s->z_imag)
+    ),
+    s->c_real
+  );
+
+  __m512 next_z_imag = _mm512_add_ps(
+    _mm512_mul_ps(
+      _mm512_add_ps(s->z_real, s->z_real), // efficient 2 * Re(z)
+      s->z_imag
+    ),
+    s->c_imag
+  );
+
+  // optimised away and into the most recent operation (in both cases, the add)
+  s->z_real = _mm512_mask_mov_ps(s->z_real, write_mask, next_z_real);
+  s->z_imag = _mm512_mask_mov_ps(s->z_imag, write_mask, next_z_imag);
+}
+
+__m128i EscapeTime::compute(uint8_t iterations, __m512 real_block, __m512 imag_block) const noexcept {
   // what we want to do is z <- z^2 + c, where z,c \in \mathbb{C}.
   // because they're both complex, we have to do slightly different things to both the real and imaginary components.
   // there is an intrinsic for complex multiplication, but it's only available on the fanciest xeons, and operates only on half floats, so we do it ourselves
 
   // can't not be auto
-  auto [z_real, z_imag, c_real, c_imag] = this->initial(real_block, imag_block);
+  State now = this->initial(real_block, imag_block);
 
   // we mask away the ones we don't want to continue calculating, as otherwise they'll wind up at infinity or NaN.
   // at first, set it to all ones. (optimised down to kxnor)
@@ -23,8 +52,8 @@ __m128i ComplexQuadratic::compute(uint8_t iterations, __m512 real_block, __m512 
     // which is easily calculable as Re(z)^2 + Im(z)^2.
     // don't worry, optimiser will be kind enough to reuse the squaring of these values.
     __m512 square_magnitude = _mm512_add_ps(
-      _mm512_mul_ps(z_real, z_real),
-      _mm512_mul_ps(z_imag, z_imag)
+      _mm512_mul_ps(now.z_real, now.z_real),
+      _mm512_mul_ps(now.z_imag, now.z_imag)
     );
 
     // compare with mode NLT_UQ, which means "Not Less Than Unordered Quiet", or in other words:
@@ -48,31 +77,8 @@ __m128i ComplexQuadratic::compute(uint8_t iterations, __m512 real_block, __m512 
     // therefore, we turn off specifially those bits in our existing mask, eliminating those
     still_left = _kandn_mask16(infinite, still_left);
 
-    // z = z^2 + c. in other words:
-    // Re(z) = Re(z)^2 - Im(z)^2 + Re(c)
-    // Im(z) = 2 * Re(z) * Im(z) + Im(c)
-
-    // we don't set them right away, for two reasons: to add the masks later,
-    // and that Im(z) depends on Re(z), and we don't want this to be the new Re(z).
-    __m512 next_z_real = _mm512_add_ps(
-      _mm512_sub_ps(
-        _mm512_mul_ps(z_real, z_real), // optimiser is clever enough to squash this into a fused multiply-add instruction
-        _mm512_mul_ps(z_imag, z_imag)
-      ),
-      c_real
-    );
-
-    __m512 next_z_imag = _mm512_add_ps(
-      _mm512_mul_ps(
-        _mm512_add_ps(z_real, z_real), // efficient 2 * Re(z)
-        z_imag
-      ),
-      c_imag
-    );
-
-    // optimised away and into the most recent operation (in both cases, the add)
-    z_real = _mm512_mask_mov_ps(z_real, still_left, next_z_real);
-    z_imag = _mm512_mask_mov_ps(z_imag, still_left, next_z_imag);
+    // iterate. the exact function is obscured behind the virtual method iterate().
+    this->iterate(&now, still_left);
   }
 
   return hues;

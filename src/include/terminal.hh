@@ -105,14 +105,13 @@ namespace terminal {
     // top layer may not be square, but we can guarantee that lower ones are
     const offset_t<size_t> square_size_blks;
 
+    // the size of the visited list below
+    size_t visited_size;
+
   public:
     // keep a visited list. this is realloc'd on push
     void * visited;
 
-  private:
-    size_t visited_size;
-
-  public:
     const Limits& lim() const;
     const offset_t<size_t>& get_size_blks() const;
 

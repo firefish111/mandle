@@ -3,6 +3,7 @@
 #include "include/mandelbrot.hh"
 #include "include/julia.hh"
 #include "include/douady_rabbit.hh"
+#include "include/burning_ship.hh"
 
 #include <cctype>
 #include <cstdio>
@@ -25,8 +26,9 @@ int main(int argc, char *argv[]) {
 usage:
     fprintf(stderr, "usage:\t%s m - show Mandelbrot set\n"
       "\t%s j [real] [imaginary] - show Julia set with c = [real] + [imaginary] * i\n"
-      "\t%s dr - show Douady rabbit (equivalent to j %f %f)\n",
-      argv[0], argv[0], argv[0], DOUADY_REAL, DOUADY_IMAG);
+      "\t%s dr - show Douady rabbit (equivalent to j %f %f)\n"
+      "\t%s bs - show Burning Ship fractal\n",
+      argv[0], argv[0], argv[0], DOUADY_REAL, DOUADY_IMAG, argv[0]);
     return 1;
   }
   // argc is guaranteed to be more than 1
@@ -57,6 +59,8 @@ usage:
     );
   } else if (argv[1][0] == 'd' && argv[1][1] == 'r') {
     v = new DouadyRabbit();
+  } else if (argv[1][0] == 'b' && argv[1][1] == 's') {
+    v = new BurningShip();
   } else {
     goto usage;
   }

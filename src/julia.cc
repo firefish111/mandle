@@ -1,10 +1,11 @@
 #include "include/julia.hh"
+#include "include/escape_time.hh"
 #include "include/terminal.hh"
 
-Julia::InitialConditions Julia::initial(__m512 real_block, __m512 imag_block) const noexcept {
+Julia::State Julia::initial(__m512 real_block, __m512 imag_block) const noexcept {
   // parameters are given as what varies.
   // this varies z and sets c to our constant
-  return (InitialConditions) {
+  return (State) {
     .z_real = real_block,
     .z_imag = imag_block,
     .c_real = _mm512_set1_ps(this->c_real),
@@ -13,7 +14,7 @@ Julia::InitialConditions Julia::initial(__m512 real_block, __m512 imag_block) co
 }
 
 Julia::Julia(float c_real, float c_imag) :
-  ComplexQuadratic(terminal::Limits(-2.0f, 2.0f, -1.5f, 1.5f, 4, 3)),
+  EscapeTime(terminal::Limits(-2.0f, 2.0f, -1.5f, 1.5f, 4, 3)),
   c_real(c_real),
   c_imag(c_imag)
 {}

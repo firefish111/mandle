@@ -1,14 +1,14 @@
 #pragma once
 
 #include <cmath>
-#include "complex_quadratic.hh"
+#include "escape_time.hh"
 
 // julia set. instead of varying c, vary z and provide a constant c.
-class Julia : public ComplexQuadratic {
+class Julia : public EscapeTime {
   const float c_real;
   const float c_imag;
 
-  InitialConditions initial(__m512 real_block, __m512 imag_block) const noexcept override;
+  State initial(__m512 real_block, __m512 imag_block) const noexcept override;
 
   // escape radius R > 0 must adhere to the following inequality: R^2 - R >= |c| given c.
   // we choose the smallest reasonable R by taking the ceiling

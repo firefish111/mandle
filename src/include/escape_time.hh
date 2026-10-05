@@ -1,13 +1,15 @@
 #pragma once
 
 #include "viewer.hh"
+#include <immintrin.h>
 
 // superclass of Julia and Mandelbrot sets.
-// this is an iterative function that creates a 2d plot is z <- z^2 + c, where z,c \in \mathbb{C}.
+// this is an iterative function that creates a 2d plot of an escape-time graph in the complex plane.
+// by default in z <- z^2 + c, where z,c \in \mathbb{C}. the exact function can be changed by children
 // because the only difference between them is the initial conditions, we have a virtual method for our children to define them.
-class ComplexQuadratic : public Viewer {
+class EscapeTime : public Viewer {
 protected:
-  struct InitialConditions {
+  struct State {
     __m512 z_real;
     __m512 z_imag;
     __m512 c_real;
@@ -15,7 +17,10 @@ protected:
   };
 
   // return initial conditions based on the iterating block
-  virtual InitialConditions initial(__m512 real_block, __m512 imag_block) const noexcept = 0;
+  virtual State initial(__m512 real_block, __m512 imag_block) const noexcept = 0;
+
+  // progress the iteration by one
+  virtual void iterate(State * s, __mmask16 write_mask) const noexcept;
 
   // the radius after which infinity is guaranteed.
   // squared to ease computation
