@@ -133,7 +133,12 @@ usage:
 
   after_char_loop:
     // zoom has changed if we get to here, therefore we reinitialise visited
-    v->bounds.initialise_visited_from_top();
+    bool needs_changing = v->bounds.initialise_visited_from_top();
+
+    if (needs_changing) {
+      // if visited has *actually* changed, then we change the huebuf
+      v->resize_buffer();
+    }
   }
 
   return 0;

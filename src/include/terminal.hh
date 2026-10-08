@@ -123,7 +123,8 @@ namespace terminal {
       this->viewport.back() += d;
     }
 
-    void initialise_visited_from_top();
+    // returns whether it has changed the visited list, and also whether huebuf needs to change
+    bool initialise_visited_from_top();
     void clear_visited() const;
 
     // get the separators between pixels, as a pair of (real, imag)

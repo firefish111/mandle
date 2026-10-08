@@ -41,6 +41,9 @@ public:
   void walk() const;
   void draw() const;
 
+  // resizes the huebuf buffer
+  void resize_buffer();
+
   Viewer(terminal::Limits lim);
   ~Viewer();
 };

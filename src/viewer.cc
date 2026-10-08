@@ -112,10 +112,25 @@ void Viewer::draw() const {
   }
 }
 
-Viewer::Viewer(terminal::Limits lim) : bounds(lim) {
+// realloc buffer
+void Viewer::resize_buffer() {
+  // no such thing as aligned realloc, so we just have to free and reallocate again.
+  // this is not a problem, as we don't want to keep the contents anyway,
+  // so this avoids potential timewasting calls to memcpy
+  // which we don't want as we will redraw it all anyway
+
+  // free existing one
+  free(this->huebuf.xmmtab);
+
   const auto size = this->bounds.get_size_blks();
   // doesn't matter which union element we use, but using xmmtab to demonstrate 16-alignment
   this->huebuf.xmmtab = (__m128i *) aligned_alloc(16, size.x * size.y * BLOCK_N_CELLS); // has to be aligned at 16 bytes for an xmm register
+}
+
+Viewer::Viewer(terminal::Limits lim) : bounds(lim) {
+  // set initial sizing of buffer. we just set current size to null, then free it
+  this->huebuf.xmmtab = nullptr;
+  resize_buffer();
 }
 
 Viewer::~Viewer() {

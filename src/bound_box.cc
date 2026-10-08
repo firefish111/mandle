@@ -109,15 +109,22 @@ namespace terminal {
     }
   }
 
-  void BoundBox::initialise_visited_from_top() {
+  // returns whether the visited list has changed or not
+  bool BoundBox::initialise_visited_from_top() {
     auto [x, y] = this->get_size_blks();
     size_t area = x * y;
     // ceiling divide area by 8
     size_t new_size = (area / 8) + !!(area % 8);
 
-    // realloc
-    this->visited = realloc(this->visited, new_size);
-    visited_size = new_size;
+    // whether dimensions have changed (avoid unnecessary calls to realloc)
+    bool has_changed = new_size != visited_size;
+    if (has_changed) {
+      // realloc
+      this->visited = realloc(this->visited, new_size);
+      visited_size = new_size;
+    }
+
+    return has_changed;
   }
 
   void BoundBox::clear_visited() const {
