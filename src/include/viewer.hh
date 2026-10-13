@@ -9,9 +9,10 @@
 #define BORDER_SIDE "│"
 
 // wrapper around bts instruction. inline so it gets optimised away.
-inline bool bit_test_and_set_high(const void *src, uint32_t bit) {
+// use `lock` to turn this into a semaphore for access rights, for multiple threads
+inline bool bit_test_and_set_high_semaphore(const void *src, uint32_t bit) {
   bool o;
-  asm volatile ("btsl %2, (%1)" :
+  asm volatile ("lock btsl %2, (%1)" :
       "=@ccc" (o)
       : "r" (src),
         "ir" (bit)

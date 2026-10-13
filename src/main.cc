@@ -4,6 +4,7 @@
 #include "include/julia.hh"
 #include "include/douady_rabbit.hh"
 #include "include/burning_ship.hh"
+#include "include/sierpinski_carpet.hh"
 
 #include <cctype>
 #include <cstdio>
@@ -27,8 +28,9 @@ usage:
     fprintf(stderr, "usage:\t%s m - show Mandelbrot set\n"
       "\t%s j [real] [imaginary] - show Julia set with c = [real] + [imaginary] * i\n"
       "\t%s dr - show Douady rabbit (equivalent to j %f %f)\n"
-      "\t%s bs - show Burning Ship fractal\n",
-      argv[0], argv[0], argv[0], DOUADY_REAL, DOUADY_IMAG, argv[0]);
+      "\t%s bs - show Burning Ship fractal\n"
+      "\t%s sc - show the Sierpiński carpet (more iterations are done with greater zoom)\n",
+      argv[0], argv[0], argv[0], DOUADY_REAL, DOUADY_IMAG, argv[0], argv[0]);
     return 1;
   }
   // argc is guaranteed to be more than 1
@@ -61,6 +63,8 @@ usage:
     v = new DouadyRabbit();
   } else if (argv[1][0] == 'b' && argv[1][1] == 's') {
     v = new BurningShip();
+  } else if (argv[1][0] == 's' && argv[1][1] == 'c') {
+    v = new SierpinskiCarpet();
   } else {
     goto usage;
   }

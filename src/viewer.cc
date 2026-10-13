@@ -19,13 +19,15 @@ void Viewer::walk(unsigned block_x, unsigned block_y, __m512 real, __m512 imag) 
   unsigned block_id = block_x + (block_y * size.x);
 
   // we set it to visited, but if it was already visited, we return
-  bool was_visited = bit_test_and_set_high(this->bounds.visited, block_id);
+  bool was_visited = bit_test_and_set_high_semaphore(this->bounds.visited, block_id);
   if (was_visited) return;
 
   // do 255 iterations. the function writes to its out buffer how many iterations are left
   // when it surpasses the outer limit, so by starting with the maximum (255), we can just
   // negate it to yield a 1-255 of how many iterations it took, whilst keeping 0 the same.
-  this->huebuf.xmmtab[block_id] = this->compute(255, real, imag);
+  //
+  // stream: non-temporal write, to avoid cache pollution
+  _mm_stream_si128(this->huebuf.xmmtab + block_id, this->compute(255, real, imag));
 
   if (block_x + 1 < size.x) {
     /* recurse across in real direction */
